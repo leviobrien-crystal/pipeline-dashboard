@@ -1,0 +1,8 @@
+{
+  "name": "pipeline-dashboard",
+  "version": "1.0.0",
+  "description": "Live pipeline dashboard connected to HubSpot",
+  "engines": {
+    "node": ">=18"
+  }
+}
