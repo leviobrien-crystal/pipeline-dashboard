@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#141414;--bg2:#1e1e1e;--bg3:#0d0d0d;--bg4:#282828;
+  --text:#f0f0ee;--text2:#a0a09c;--text3:#606060;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.16);
+  --accent:#7c6af7;--accent-h:#8f7ff9;--accent-bg:rgba(124,106,247,0.15);--accent-t:#b8aeff;
+  --green:#4caf72;--green-bg:rgba(76,175,114,0.15);--green-t:#7dd9a0;
+  --red:#e05252;--red-bg:rgba(224,82,82,0.15);--red-t:#f09595;
+  --blue:#5b9ef7;--blue-bg:rgba(91,158,247,0.15);--blue-t:#85B7EB;
+  --amber:#e8a030;--amber-bg:rgba(232,160,48,0.15);--amber-t:#f5bf6a;
+  --r:8px;--rl:10px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);font-size:13px;line-height:1.5}
+
+/* Header */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 20px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px}
+.hdr-l{display:flex;align-items:center;gap:12px}
+.logo{height:28px;filter:brightness(0) invert(1)}
+.hdiv{width:1px;height:22px;background:rgba(255,255,255,0.15)}
+.htitle{font-size:15px;font-weight:600}
+.hsub{font-size:11px;color:var(--text3);margin-top:1px}
+.btn-r{padding:6px 14px;font-size:12px;border:none;border-radius:var(--r);background:var(--accent);color:#fff;cursor:pointer;font-weight:500}
+.btn-r:hover{background:var(--accent-h)}
+.btn-r:disabled{opacity:.5;cursor:not-allowed}
+
+/* Loading */
+#loading{text-align:center;padding:80px 20px;color:var(--text2)}
+.spinner{width:32px;height:32px;border:3px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#err{background:var(--red-bg);color:var(--red-t);border:1px solid var(--red);padding:14px;border-radius:var(--rl);margin:12px 20px;display:none}
+
+/* Section nav (top level) */
+.sec-nav{display:flex;gap:0;border-bottom:1px solid var(--border2);padding:0 20px;background:var(--bg2)}
+.sec-tab{padding:10px 18px;font-size:13px;cursor:pointer;border:none;background:transparent;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500;white-space:nowrap}
+.sec-tab:hover{color:var(--text)}
+.sec-tab.active{color:var(--accent-t);border-bottom-color:var(--accent);font-weight:600}
+
+/* Sub nav (within section) */
+.sub-nav{display:flex;gap:2px;padding:10px 20px 0;background:var(--bg2);border-bottom:1px solid var(--border)}
+.sub-tab{padding:5px 13px;font-size:12px;cursor:pointer;border:none;border-radius:6px 6px 0 0;background:transparent;color:var(--text2);white-space:nowrap;margin-bottom:-1px;border:1px solid transparent;border-bottom:none}
+.sub-tab:hover{background:var(--bg4);color:var(--text)}
+.sub-tab.active{background:var(--bg3);color:var(--text);border-color:var(--border);font-weight:500}
+
+#dashboard{padding:14px 20px}
+
+/* Global filters */
+.gf{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:14px}
+.gfl{font-size:11px;color:var(--text2);white-space:nowrap;font-weight:500}
+.gfs{width:1px;height:16px;background:var(--border2)}
+.gfa{font-size:10px;color:var(--accent-t);margin-left:4px}
+select{font-size:12px;padding:4px 8px;border:1px solid var(--border2);border-radius:6px;background:var(--bg4);color:var(--text);cursor:pointer}
+select:hover,select:focus{outline:none;border-color:var(--accent)}
+select.filter-active{border-color:var(--accent);background:var(--accent-bg);color:var(--accent-t);font-weight:500}
+
+/* Filter bar */
+.filter-bar{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.filter-toggle{display:flex;align-items:center;gap:7px;padding:7px 14px;background:var(--accent);border:1px solid var(--accent);border-radius:var(--r);color:#fff;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+.filter-toggle:hover{background:var(--accent-h);border-color:var(--accent-h)}
+.filter-toggle.open{background:var(--accent-h);border-color:var(--accent-h)}
+.filter-caret{font-size:11px;opacity:.7;transition:transform .2s}
+.filter-caret.open{transform:rotate(180deg)}
+.filter-summary{font-size:13px;color:var(--text);font-weight:500}
+.filter-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px 16px;margin-bottom:14px}
+.filter-row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+.filter-cell{display:flex;flex-direction:column;gap:5px}
+.filter-cell label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.filter-reset{padding:5px 12px;font-size:11px;border:1px solid var(--border2);border-radius:6px;background:transparent;color:var(--text2);cursor:pointer;margin-left:auto;align-self:flex-end}
+.filter-reset:hover{border-color:var(--red);color:var(--red-t)}
+
+/* Multi-select chips */
+.chip-group{display:flex;flex-wrap:wrap;gap:4px;max-width:320px;align-items:center}
+.chip{font-size:11px;padding:3px 9px;border:1px solid var(--border2);border-radius:12px;color:var(--text2);cursor:pointer;user-select:none;white-space:nowrap;transition:all .15s}
+.chip:hover{border-color:var(--accent);color:var(--accent-t)}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+
+/* Weekly summary */
+.week-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:14px;overflow:hidden}
+.week-toggle{width:100%;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:transparent;border:none;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;text-align:left}
+.week-toggle:hover{background:var(--bg3)}
+.week-caret{font-size:11px;opacity:.7;transition:transform .2s}
+.week-caret.open{transform:rotate(180deg)}
+.week-body{padding:0 16px 14px 16px;display:none}
+.week-body.open{display:block}
+.week-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:4px}
+.week-bucket{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:10px 12px}
+.week-bucket-title{font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.week-bucket-count{background:var(--bg4);color:var(--text);padding:1px 7px;border-radius:10px;font-size:10px}
+.week-bucket ul{list-style:none;padding:0;margin:0;max-height:200px;overflow-y:auto}
+.week-bucket li{font-size:12px;color:var(--text);padding:3px 0;display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border);line-height:1.3}
+.week-bucket li:last-child{border-bottom:none}
+.week-bucket li .wb-sub{color:var(--text3);font-size:11px;white-space:nowrap;flex-shrink:0}
+.week-bucket-empty{color:var(--text3);font-size:11px;font-style:italic;padding:4px 0}
+
+/* Grids */
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.g-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+@media(max-width:900px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.g4,.g2{grid-template-columns:1fr}}
+
+/* Metrics */
+.metric{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.fc-metric{padding:10px 14px}
+.metric .lbl{font-size:10px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;font-weight:500}
+.metric .val{font-size:24px;font-weight:700;color:var(--text);letter-spacing:-.5px}
+.metric .sub{font-size:12px;color:var(--text2);margin-top:3px}
+.metric .breakdown{font-size:10px;color:var(--text3);margin-top:4px;line-height:1.6}
+
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;margin-bottom:14px}
+.ct{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+.leg{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;font-size:11px;color:var(--text2)}
+.leg span{display:flex;align-items:center;gap:5px}
+.dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+
+/* Tables */
+table{width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed}
+th{font-weight:600;color:var(--text2);padding:8px 10px;border-bottom:1px solid var(--border2);font-size:10px;text-align:left;white-space:nowrap;cursor:pointer;user-select:none;text-transform:uppercase;letter-spacing:.05em;background:var(--bg3)}
+th:hover{color:var(--accent-t)}
+th .si{margin-left:3px;opacity:.4}
+th.sa .si,th.sd .si{opacity:1;color:var(--accent)}
+td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(124,106,247,.05)}
+
+/* Group rows */
+.qr td{background:rgba(124,106,247,.14)!important;font-size:12px;font-weight:700;color:var(--accent-t);padding:9px 10px;border-top:1px solid var(--border);border-bottom:1px solid rgba(124,106,247,.3);letter-spacing:.04em;text-transform:uppercase}
+.mr td{background:var(--bg3)!important;font-size:10px;font-weight:600;color:#d0d0cc;padding:5px 10px 5px 20px;border-bottom:1px solid var(--border);letter-spacing:.03em;text-transform:uppercase}
+
+/* Badges */
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
+.b-won{background:var(--green-bg);color:var(--green-t)}
+.b-lost{background:var(--red-bg);color:var(--red-t)}
+.b-open{background:var(--blue-bg);color:var(--blue-t)}
+.b-warn{background:var(--amber-bg);color:var(--amber-t)}
+.b-neutral{background:rgba(255,255,255,.06);color:var(--text2)}
+.fc-commit{background:var(--green-bg);color:var(--green-t)}
+.fc-most{background:var(--blue-bg);color:var(--blue-t)}
+.fc-best{background:var(--amber-bg);color:var(--amber-t)}
+.fc-pipeline{background:rgba(255,255,255,.06);color:var(--text2)}
+
+.pill{display:inline-flex;flex-direction:column;align-items:center;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:500;min-width:46px;line-height:1.3}
+.pill .pct{font-size:10px;font-weight:400;opacity:.85}
+.pw{background:var(--green-bg);color:var(--green-t)}
+.pl{background:var(--red-bg);color:var(--red-t)}
+.pm{background:var(--amber-bg);color:var(--amber-t)}
+
+.dim-toggle{display:flex;gap:4px;background:var(--bg3);border-radius:var(--r);padding:3px;border:1px solid var(--border)}
+.dim-btn{padding:4px 12px;font-size:11px;cursor:pointer;border:none;border-radius:5px;background:transparent;color:var(--text2)}
+.dim-btn.active{background:var(--accent);color:#fff;font-weight:500}
+
+.chart-wrap{position:relative;width:100%}
+
+
+.sec{display:none}.sec.active{display:block}
+.view{display:none}.view.active{display:block}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="hdr">
+    <div class="hdr-l">
+      <img src="https://www.jewelersuite.com/hubfs/JewelerSuite%20Logo%20-%20White.png" class="logo" alt="JewelerSuite" onerror="this.style.display='none'">
+      <div class="hdiv"></div>
+      <div><div class="htitle">Pipeline Dashboard</div><div class="hsub" id="last-updated">Loading...</div></div>
+    </div>
+    <button class="btn-r" id="btn-r" onclick="loadData()">↻ Refresh</button>
+  </div>
+
+  <div id="err"></div>
+  <div id="loading" style="padding:80px 20px">
+    <div class="spinner"></div>
+    <div id="lmsg">Connecting to HubSpot...</div>
+    <div style="margin-top:6px;font-size:12px;color:var(--text3)">This takes 5–10 seconds</div>
+  </div>
+
+  <div id="dashboard" style="display:none">
+
+    <!-- Section nav -->
+    <div class="sec-nav" id="sec-nav">
+      <button class="sec-tab active" onclick="showSec('overview',this)">Overview</button>
+      <button class="sec-tab" onclick="showSec('analysis',this)">Deal Analysis</button>
+      <button class="sec-tab" onclick="showSec('expansion',this)">Renewals & Expansion</button>
+      <button class="sec-tab" onclick="showSec('revenue',this)">Revenue & Implementation</button>
+    </div>
+
+    <!-- SECTION: OVERVIEW -->
+    <div id="sec-overview" class="sec active">
+      <div style="padding:14px 20px">
+        <div class="filter-bar">
+          <button class="filter-toggle" id="filter-toggle-btn-ov" onclick="toggleFilters('ov')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+            Filters
+            <span class="filter-caret" id="filter-caret-ov">▾</span>
+          </button>
+          <span class="filter-summary" id="filter-summary-ov">Closing: Q2 2026</span>
+        </div>
+        <div class="filter-panel" id="filter-panel-ov" style="display:none">
+          <div class="filter-row">
+            <div class="filter-cell">
+              <label class="gfl">Created in</label>
+              <select id="gf-created-ov" onchange="applyFilters('ov')">
+                <option value="all">All time</option>
+                <option value="fy26">FY26</option>
+                <option value="q2-26">Q2 2026</option>
+                <option value="q1-26">Q1 2026</option>
+                <option value="q4-25">Q4 2025</option>
+                <option value="2026-04">Apr 2026</option>
+                <option value="2026-03">Mar 2026</option>
+                <option value="2026-02">Feb 2026</option>
+                <option value="2026-01">Jan 2026</option>
+                <option value="2025-12">Dec 2025</option>
+                <option value="2025-11">Nov 2025</option>
+                <option value="2025-10">Oct 2025</option>
+              </select>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Closing in</label>
+              <select id="gf-closing-ov" onchange="applyFilters('ov')">
+                <option value="all">All time</option>
+                <option value="fy26">FY26</option>
+                <option value="q2-26" selected>Q2 2026</option>
+                <option value="q3-26">Q3 2026</option>
+                <option value="q1-26">Q1 2026</option>
+                <option value="q4-25">Q4 2025</option>
+                <option value="2026-09">Sep 2026</option>
+                <option value="2026-08">Aug 2026</option>
+                <option value="2026-07">Jul 2026</option>
+                <option value="2026-06">Jun 2026</option>
+                <option value="2026-05">May 2026</option>
+                <option value="2026-04">Apr 2026</option>
+                <option value="2026-03">Mar 2026</option>
+                <option value="2026-02">Feb 2026</option>
+                <option value="2026-01">Jan 2026</option>
+              </select>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Size</label>
+              <select id="gf-sz-ov" onchange="applyFilters('ov')"><option value="">All</option><option>SMB</option><option>Medium+</option><option>Mid-Market</option><option>Enterprise</option></select>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Segmentation</label>
+              <select id="gf-sg-ov" onchange="applyFilters('ov')"><option value="">All</option></select>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Owner / BDR</label>
+              <select id="gf-owner-ov" onchange="applyFilters('ov')">
+                <option value="">All owners</option>
+                <option value="81638455">Levi O'Brien</option>
+                <option value="77422527">Michael Razny</option>
+                <option value="77425580">Emily Lawless</option>
+                <option value="78064629">Hannah Heintze</option>
+                <option value="78930942">Brady Jensen</option>
+                <option value="82442702">Dhru-Vina Patel</option>
+                <option value="84615860">Kei Wakabayashi</option>
+                <option value="84615861">Hemalatha Palani</option>
+              </select>
+            </div>
+            <button class="filter-reset" onclick="resetFilters('ov')">Reset</button>
+          </div>
+        </div>
+
+        <!-- Weekly summary (rolling 7 days forward) -->
+        <div class="week-card" id="weekly-summary">
+          <button class="week-toggle" onclick="toggleWeekly()">
+            <span style="display:flex;align-items:center;gap:8px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              This week <span id="week-range" style="color:var(--text3);font-weight:400;font-size:12px"></span>
+            </span>
+            <span class="week-caret" id="week-caret">▾</span>
+          </button>
+          <div class="week-body" id="week-body"></div>
+        </div>
+        <div class="g-metrics" id="m-top"></div>
+        <div class="g4" id="m-forecast" style="margin-bottom:14px"></div>
+        <div class="g2">
+          <div class="card"><div class="ct">Pipeline by size</div>
+            <div class="leg"><span><span class="dot" style="background:#4caf72"></span>Won</span><span><span class="dot" style="background:#e05252"></span>Lost</span><span><span class="dot" style="background:#5b9ef7"></span>Open</span></div>
+            <div class="chart-wrap" style="height:200px"><canvas id="c-seg" role="img" aria-label="Pipeline by segment"></canvas></div>
+          </div>
+          <div class="card"><div class="ct">Win rate by size</div>
+            <div class="chart-wrap" style="height:200px"><canvas id="c-wr" role="img" aria-label="Win rate by segment"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="ct">Open deals <span id="ov-open-lbl" style="font-size:10px;color:var(--accent-t);font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+          <div style="overflow-x:auto"><table><thead><tr>
+            <th style="width:19%" onclick="srt('ov-open','name',this)">Account <span class="si">↕</span></th>
+            <th style="width:8%" onclick="srt('ov-open','closedate',this)">Close date <span class="si">↕</span></th>
+            <th style="width:7%" onclick="srt('ov-open','amt',this)">ARR <span class="si">↕</span></th>
+            <th style="width:6%" onclick="srt('ov-open','mrr',this)">MRR <span class="si">↕</span></th>
+            <th style="width:8%">Impl. $</th>
+            <th style="width:13%" onclick="srt('ov-open','stage',this)">Stage <span class="si">↕</span></th>
+            <th style="width:9%" onclick="srt('ov-open','fc',this)">Forecast <span class="si">↕</span></th>
+            <th style="width:8%" onclick="srt('ov-open','golive',this)">Go-live <span class="si">↕</span></th>
+            <th style="width:8%" onclick="srt('ov-open','soft_launch',this)">Soft launch <span class="si">↕</span></th>
+            <th style="width:10%" onclick="srt('ov-open','nextstepdate',this)">Next step date <span class="si">↕</span></th>
+          </tr></thead><tbody id="ov-open-rows"></tbody></table></div>
+        </div>
+        <div class="card"><div class="ct">Won deals</div>
+          <div style="overflow-x:auto"><table><thead><tr>
+            <th style="width:20%" onclick="srt('ov-won','name',this)">Account <span class="si">↕</span></th>
+            <th style="width:8%" onclick="srt('ov-won','size',this)">Size <span class="si">↕</span></th>
+            <th style="width:14%" onclick="srt('ov-won','seg',this)">Segmentation <span class="si">↕</span></th>
+            <th style="width:16%">Competitors</th>
+            <th style="width:16%">Won reason</th>
+            <th style="width:8%" onclick="srt('ov-won','amt',this)">ARR <span class="si">↕</span></th>
+            <th style="width:6%" onclick="srt('ov-won','mrr',this)">MRR <span class="si">↕</span></th>
+            <th style="width:10%" onclick="srt('ov-won','closedate',this)">Close date <span class="si">↕</span></th>
+          </tr></thead><tbody id="ov-won-rows"></tbody></table></div>
+        </div>
+        <div class="card"><div class="ct">Lost deals</div>
+          <div style="overflow-x:auto"><table><thead><tr>
+            <th style="width:20%" onclick="srt('ov-lost','name',this)">Account <span class="si">↕</span></th>
+            <th style="width:8%" onclick="srt('ov-lost','size',this)">Size <span class="si">↕</span></th>
+            <th style="width:13%" onclick="srt('ov-lost','seg',this)">Segmentation <span class="si">↕</span></th>
+            <th style="width:12%">Lost to</th>
+            <th style="width:14%">Loss reason</th>
+            <th style="width:8%" onclick="srt('ov-lost','amt',this)">ARR <span class="si">↕</span></th>
+            <th style="width:6%" onclick="srt('ov-lost','mrr',this)">MRR <span class="si">↕</span></th>
+            <th style="width:10%" onclick="srt('ov-lost','closedate',this)">Close date <span class="si">↕</span></th>
+          </tr></thead><tbody id="ov-lost-rows"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION: DEAL ANALYSIS -->
+    <div id="sec-analysis" class="sec">
+      <div class="sub-nav" id="analysis-subnav">
+        <button class="sub-tab active" onclick="showView('v-losses','analysis-subnav',this)">Loss Reasons</button>
+        <button class="sub-tab" onclick="showView('v-competitors','analysis-subnav',this)">Competitors</button>
+        <button class="sub-tab" onclick="showView('v-pos','analysis-subnav',this)">Current POS</button>
+        <button class="sub-tab" onclick="showView('v-winrate','analysis-subnav',this)">Win Rate Matrix</button>
+        <button class="sub-tab" onclick="showView('v-velocity','analysis-subnav',this)">Velocity</button>
+        <button class="sub-tab" onclick="showView('v-alldeals','analysis-subnav',this)">All Deals</button>
+      </div>
+      <div style="padding:14px 20px">
+  <div class="filter-bar">
+          <button class="filter-toggle" id="filter-toggle-btn-an" onclick="toggleFilters('an')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+            Filters
+            <span class="filter-caret" id="filter-caret-an">▾</span>
+          </button>
+          <span class="filter-summary" id="filter-summary-an">Closing: Q2 2026</span>
+        </div>
+        <div class="filter-panel" id="filter-panel-an" style="display:none">
+          <div class="filter-row">
+            <div class="filter-cell">
+              <label class="gfl">Created in</label>
+              <select id="gf-created-an" onchange="applyFilters('an')">
+                <option value="all">All time</option>
+                <option value="fy26">FY26</option>
+                <option value="q2-26">Q2 2026</option>
+                <option value="q1-26">Q1 2026</option>
+                <option value="q4-25">Q4 2025</option>
+                <option value="2026-04">Apr 2026</option>
+                <option value="2026-03">Mar 2026</option>
+                <option value="2026-02">Feb 2026</option>
+                <option value="2026-01">Jan 2026</option>
+                <option value="2025-12">Dec 2025</option>
+                <option value="2025-11">Nov 2025</option>
+                <option value="2025-10">Oct 2025</option>
+              </select>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Closing in</label>
+              <select id="gf-closing-an" onchange="applyFilters('an')">
+                <option value="all">All time</option>
+                <option value="fy26">FY26</option>
+                <option value="q2-26" selected>Q2 2026</option>
+                <option value="q3-26">Q3 2026</option>
+                <option value="q1-26">Q1 2026</option>
+                <option value="q4-25">Q4 2025</option>
+                <option value="2026-09">Sep 2026</option>
+                <option value="2026-08">Aug 2026</option>
+                <option value="2026-07">Jul 2026</option>
+                <option value="2026-06">Jun 2026</option>
+                <option value="2026-05">May 2026</option>
+                <option value="2026-04">Apr 2026</option>
+                <option value="2026-03">Mar 2026</option>
+                <option value="2026-02">Feb 2026</option>
+                <option value="2026-01">Jan 2026</option>
+              </select>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Size</label>
+              <select id="gf-sz-an" onchange="applyFilters('an')"><option value="">All</option><option>SMB</option><option>Medium+</option><option>Mid-Market</option><option>Enterprise</option></select>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Segmentation</label>
+              <select id="gf-sg-an" onchange="applyFilters('an')"><option value="">All</option></select>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Owner / BDR</label>
+              <select id="gf-owner-an" onchange="applyFilters('an')">
+                <option value="">All owners</option>
+                <option value="81638455">Levi O'Brien</option>
+                <option value="77422527">Michael Razny</option>
+                <option value="77425580">Emily Lawless</option>
+                <option value="78064629">Hannah Heintze</option>
+                <option value="78930942">Brady Jensen</option>
+                <option value="82442702">Dhru-Vina Patel</option>
+                <option value="84615860">Kei Wakabayashi</option>
+                <option value="84615861">Hemalatha Palani</option>
+              </select>
+            </div>
+                        <div class="filter-cell">
+              <label class="gfl">Competitor</label>
+              <div class="chip-group" id="gf-comp-an"></div>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Outcome</label>
+              <div class="chip-group" id="gf-outcome-an">
+                <span class="chip" data-val="Won" onclick="toggleChip(this, 'an')">Won</span>
+                <span class="chip" data-val="Lost" onclick="toggleChip(this, 'an')">Lost</span>
+                <span class="chip" data-val="Open" onclick="toggleChip(this, 'an')">Open</span>
+              </div>
+            </div>
+            <button class="filter-reset" onclick="resetFilters('an')">Reset</button>
+          </div>
+        </div>
+        <div id="v-losses" class="view active">
+          <div class="g2">
+            <div class="card"><div class="ct">Loss reasons</div>
+              <div class="chart-wrap" style="height:220px"><canvas id="c-loss" role="img" aria-label="Loss reasons"></canvas></div>
+            </div>
+            <div class="card"><div class="ct">Lost to (specific competitor)</div>
+              <div class="chart-wrap" id="c-lostto-w"><canvas id="c-lostto" role="img" aria-label="Lost to"></canvas></div>
+            </div>
+          </div>
+          <div class="card"><div class="ct">Loss reasons by size</div>
+            <div class="leg"><span><span class="dot" style="background:#E24B4A"></span>Pricing</span><span><span class="dot" style="background:#7F77DD"></span>Product Gap</span><span><span class="dot" style="background:#EF9F27"></span>Timing</span><span><span class="dot" style="background:#888780"></span>No response</span><span><span class="dot" style="background:#B4B2A9"></span>Unqualified</span></div>
+            <div class="chart-wrap" style="height:180px"><canvas id="c-losssz" role="img" aria-label="Loss by size"></canvas></div>
+          </div>
+          <div class="card"><div class="ct">Loss reasons by segmentation</div>
+            <div class="leg"><span><span class="dot" style="background:#E24B4A"></span>Pricing</span><span><span class="dot" style="background:#7F77DD"></span>Product Gap</span><span><span class="dot" style="background:#EF9F27"></span>Timing</span><span><span class="dot" style="background:#888780"></span>No response</span><span><span class="dot" style="background:#B4B2A9"></span>Unqualified</span></div>
+            <div class="chart-wrap" id="c-lossg-w"><canvas id="c-lossg" role="img" aria-label="Loss by segmentation"></canvas></div>
+          </div>
+        </div>
+        <div id="v-competitors" class="view">
+          <div class="g2">
+            <div class="card"><div class="ct">Competitor frequency</div>
+              <div class="chart-wrap" id="c-comp-w"><canvas id="c-comp" role="img" aria-label="Competitor frequency"></canvas></div>
+            </div>
+            <div class="card"><div class="ct">Competitors by outcome</div>
+              <div class="leg"><span><span class="dot" style="background:#4caf72"></span>Won</span><span><span class="dot" style="background:#e05252"></span>Lost</span><span><span class="dot" style="background:#5b9ef7"></span>Open</span></div>
+              <div class="chart-wrap" id="c-compst-w"><canvas id="c-compst" role="img" aria-label="Competitor outcomes"></canvas></div>
+            </div>
+          </div>
+        </div>
+        <div id="v-pos" class="view">
+          <div class="g2">
+            <div class="card"><div class="ct">Current POS frequency</div>
+              <div class="chart-wrap" id="c-pos-w"><canvas id="c-pos" role="img" aria-label="POS frequency"></canvas></div>
+            </div>
+            <div class="card"><div class="ct">Current POS by outcome</div>
+              <div class="leg"><span><span class="dot" style="background:#4caf72"></span>Won</span><span><span class="dot" style="background:#e05252"></span>Lost</span><span><span class="dot" style="background:#5b9ef7"></span>Open</span></div>
+              <div class="chart-wrap" id="c-posst-w"><canvas id="c-posst" role="img" aria-label="POS by outcome"></canvas></div>
+            </div>
+          </div>
+        </div>
+        <div id="v-winrate" class="view">
+          <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+            <div style="font-size:11px;color:var(--text2)">View columns by</div>
+            <div class="dim-toggle">
+              <button class="dim-btn active" onclick="setDim('size',this)">Size</button>
+              <button class="dim-btn" onclick="setDim('segmentation',this)">Segmentation</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="ct" id="matrix-title">Win rate by competitor × size</div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Closed deals only · W–L · win%</div>
+            <div style="overflow-x:auto"><table id="matrix-table"></table></div>
+          </div>
+          <div class="card"><div class="ct">Overall win rate per competitor</div>
+            <div class="chart-wrap" id="c-wrcomp-w"><canvas id="c-wrcomp" role="img" aria-label="Win rate per competitor"></canvas></div>
+          </div>
+        </div>
+        <div id="v-velocity" class="view">
+          <div class="g4" id="m-vel"></div>
+          <div class="g2">
+            <div class="card"><div class="ct">Avg cycle length — won vs lost</div>
+              <div class="chart-wrap" style="height:180px"><canvas id="c-vwl" role="img" aria-label="Cycle won vs lost"></canvas></div>
+            </div>
+            <div class="card"><div class="ct">Avg touches — won vs lost</div>
+              <div class="chart-wrap" style="height:180px"><canvas id="c-vtch" role="img" aria-label="Touches won vs lost"></canvas></div>
+            </div>
+          </div>
+          <div class="card"><div class="ct">Open deals past avg won cycle</div>
+            <table><thead><tr>
+              <th style="width:24%">Account</th><th style="width:9%">Size</th><th style="width:16%">Stage</th>
+              <th style="width:10%">Days open</th><th style="width:8%">Touches</th>
+              <th style="width:11%">Close date</th><th style="width:22%">Competitors</th>
+            </tr></thead><tbody id="stale-rows"></tbody></table>
+          </div>
+        </div>
+        <div id="v-alldeals" class="view">
+          <div class="card"><div style="overflow-x:auto"><table>
+            <thead><tr>
+              <th style="width:16%" onclick="srt('all','name',this)">Account <span class="si">↕</span></th>
+              <th style="width:7%" onclick="srt('all','size',this)">Size <span class="si">↕</span></th>
+              <th style="width:7%" onclick="srt('all','status',this)">Status <span class="si">↕</span></th>
+              <th style="width:9%" onclick="srt('all','closedate',this)">Close date <span class="si">↕</span></th>
+              <th style="width:12%">Closed lost reason</th>
+              <th style="width:12%">Closed won reason</th>
+              <th style="width:10%">POS</th>
+              <th style="width:13%">Competitors</th>
+              <th style="width:14%">Details</th>
+            </tr></thead>
+            <tbody id="all-rows"></tbody>
+          </table></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION: RENEWALS & EXPANSION -->
+    <div id="sec-expansion" class="sec">
+      <div style="padding:14px 20px">
+        <p style="font-size:11px;color:var(--text3);margin:0 0 12px 2px">Shows deals where Deal Type is Expansion (existing business) or Renewal.</p>
+
+        <!-- Metrics -->
+        <div class="g-metrics">
+          <div class="metric" style="border-left:3px solid var(--accent)"><div class="lbl">Expansion ARR (won)</div><div class="val" id="exp-arr-w">—</div><div class="sub" id="exp-sub-w"></div></div>
+          <div class="metric" style="border-left:3px solid #5b9ef7"><div class="lbl">Expansion pipeline</div><div class="val" id="exp-arr-o">—</div><div class="sub" id="exp-sub-o"></div></div>
+          <div class="metric" style="border-left:3px solid #4caf72"><div class="lbl">Renewal ARR (won)</div><div class="val" id="ren-arr-w">—</div><div class="sub" id="ren-sub-w"></div></div>
+          <div class="metric" style="border-left:3px solid #e8a030"><div class="lbl">Renewal pipeline</div><div class="val" id="ren-arr-o">—</div><div class="sub" id="ren-sub-o"></div></div>
+        </div>
+
+        <div class="card">
+          <div class="ct">Upcoming renewals &amp; expansion <span style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none;letter-spacing:0">(next 90 days)</span></div>
+          <div style="overflow-x:auto"><table><thead><tr>
+            <th style="width:26%">Account</th>
+            <th style="width:10%">Type</th>
+            <th style="width:12%">Close date</th>
+            <th style="width:10%">ARR</th>
+            <th style="width:10%">MRR</th>
+            <th style="width:14%">Stage</th>
+            <th style="width:18%">Forecast</th>
+          </tr></thead><tbody id="exp-upcoming-rows"></tbody></table></div>
+        </div>
+
+        <div class="card">
+          <div class="ct">Won renewals &amp; expansion</div>
+          <div style="overflow-x:auto"><table><thead><tr>
+            <th style="width:28%">Account</th>
+            <th style="width:12%">Type</th>
+            <th style="width:14%">Close date</th>
+            <th style="width:12%">ARR</th>
+            <th style="width:12%">MRR</th>
+            <th style="width:22%">Won reason</th>
+          </tr></thead><tbody id="exp-won-rows"></tbody></table></div>
+        </div>
+
+        <div class="card">
+          <div class="ct">All open renewals &amp; expansion</div>
+          <div style="overflow-x:auto"><table><thead><tr>
+            <th style="width:26%">Account</th>
+            <th style="width:10%">Type</th>
+            <th style="width:12%">Close date</th>
+            <th style="width:10%">ARR</th>
+            <th style="width:10%">MRR</th>
+            <th style="width:14%">Stage</th>
+            <th style="width:18%">Forecast</th>
+          </tr></thead><tbody id="exp-open-rows"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- SECTION: REVENUE & IMPLEMENTATION -->
+    <div id="sec-revenue" class="sec">
+      <div class="sub-nav" id="rev-subnav">
+        <button class="sub-tab active" onclick="showView('v-rev2026','rev-subnav',this)">2026 Revenue</button>
+        <button class="sub-tab" onclick="showView('v-impl','rev-subnav',this)">Implementation Schedule</button>
+        <button class="sub-tab" onclick="showView('v-open','rev-subnav',this)">Open Deals Detail</button>
+      </div>
+      <div style="padding:14px 20px">
+<div class="filter-bar">
+          <button class="filter-toggle" id="filter-toggle-btn-rv" onclick="toggleFilters('rv')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+            Filters
+            <span class="filter-caret" id="filter-caret-rv">▾</span>
+          </button>
+          <span class="filter-summary" id="filter-summary-rv">Closing: Q2 2026</span>
+        </div>
+        <div class="filter-panel" id="filter-panel-rv" style="display:none">
+          <div class="filter-row">
+            <div class="filter-cell">
+              <label class="gfl">Created in</label>
+              <select id="gf-created-rv" onchange="applyFilters('rv')">
+                <option value="all">All time</option>
+                <option value="fy26">FY26</option>
+                <option value="q2-26">Q2 2026</option>
+                <option value="q1-26">Q1 2026</option>
+                <option value="q4-25">Q4 2025</option>
+                <option value="2026-04">Apr 2026</option>
+                <option value="2026-03">Mar 2026</option>
+                <option value="2026-02">Feb 2026</option>
+                <option value="2026-01">Jan 2026</option>
+                <option value="2025-12">Dec 2025</option>
+                <option value="2025-11">Nov 2025</option>
+                <option value="2025-10">Oct 2025</option>
+              </select>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Closing in</label>
+              <select id="gf-closing-rv" onchange="applyFilters('rv')">
+                <option value="all">All time</option>
+                <option value="fy26">FY26</option>
+                <option value="q2-26" selected>Q2 2026</option>
+                <option value="q3-26">Q3 2026</option>
+                <option value="q1-26">Q1 2026</option>
+                <option value="q4-25">Q4 2025</option>
+                <option value="2026-09">Sep 2026</option>
+                <option value="2026-08">Aug 2026</option>
+                <option value="2026-07">Jul 2026</option>
+                <option value="2026-06">Jun 2026</option>
+                <option value="2026-05">May 2026</option>
+                <option value="2026-04">Apr 2026</option>
+                <option value="2026-03">Mar 2026</option>
+                <option value="2026-02">Feb 2026</option>
+                <option value="2026-01">Jan 2026</option>
+              </select>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Size</label>
+              <select id="gf-sz-rv" onchange="applyFilters('rv')"><option value="">All</option><option>SMB</option><option>Medium+</option><option>Mid-Market</option><option>Enterprise</option></select>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Segmentation</label>
+              <select id="gf-sg-rv" onchange="applyFilters('rv')"><option value="">All</option></select>
+            </div>
+            <div class="filter-cell">
+              <label class="gfl">Owner / BDR</label>
+              <select id="gf-owner-rv" onchange="applyFilters('rv')">
+                <option value="">All owners</option>
+                <option value="81638455">Levi O'Brien</option>
+                <option value="77422527">Michael Razny</option>
+                <option value="77425580">Emily Lawless</option>
+                <option value="78064629">Hannah Heintze</option>
+                <option value="78930942">Brady Jensen</option>
+                <option value="82442702">Dhru-Vina Patel</option>
+                <option value="84615860">Kei Wakabayashi</option>
+                <option value="84615861">Hemalatha Palani</option>
+              </select>
+            </div>
+            <button class="filter-reset" onclick="resetFilters('rv')">Reset</button>
+          </div>
+        </div>
+        <div id="v-rev2026" class="view active">
+          <div class="g4" id="m-rev"></div>
+          <div class="card">
+            <div class="ct">2026 revenue projection</div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:10px">2026 Revenue = remaining months after Soft Launch Date × MRR. Only deals with a soft launch date set.</div>
+            <div style="overflow-x:auto"><table><thead><tr>
+              <th style="width:22%" onclick="srt('rev','name',this)">Account <span class="si">↕</span></th>
+              <th style="width:10%" onclick="srt('rev','fc',this)">Forecast <span class="si">↕</span></th>
+              <th style="width:9%" onclick="srt('rev','amt',this)">ARR <span class="si">↕</span></th>
+              <th style="width:7%" onclick="srt('rev','mrr',this)">MRR <span class="si">↕</span></th>
+              <th style="width:11%" onclick="srt('rev','soft_launch',this)">Soft launch <span class="si">↕</span></th>
+              <th style="width:11%" onclick="srt('rev','golive',this)">Go-live <span class="si">↕</span></th>
+              <th style="width:13%" onclick="srt('rev','rev2026',this)">2026 Revenue <span class="si">↕</span></th>
+            </tr></thead><tbody id="rev-rows"></tbody></table></div>
+          </div>
+        </div>
+        <div id="v-impl" class="view">
+          <div class="card"><div class="ct">Implementation schedule — sorted by soft launch date</div>
+            <div style="overflow-x:auto"><table><thead><tr>
+              <th style="width:20%" onclick="srt('impl','name',this)">Account <span class="si">↕</span></th>
+              <th style="width:9%" onclick="srt('impl','amt',this)">ARR <span class="si">↕</span></th>
+              <th style="width:7%" onclick="srt('impl','mrr',this)">MRR <span class="si">↕</span></th>
+              <th style="width:10%" onclick="srt('impl','fc',this)">Forecast <span class="si">↕</span></th>
+              <th style="width:10%" onclick="srt('impl','impl_amt',this)">Impl. $ <span class="si">↕</span></th>
+              <th style="width:11%" onclick="srt('impl','closedate',this)">Close date <span class="si">↕</span></th>
+              <th style="width:11%" onclick="srt('impl','soft_launch',this)">Soft launch <span class="si">↕</span></th>
+              <th style="width:11%" onclick="srt('impl','golive',this)">Go-live <span class="si">↕</span></th>
+            </tr></thead><tbody id="impl-rows"></tbody></table></div>
+          </div>
+        </div>
+        <div id="v-open" class="view">
+          <div class="g4" id="m-open"></div>
+          <div class="card"><div class="ct">Open deals — grouped by close date</div>
+            <div style="overflow-x:auto"><table><thead><tr>
+              <th style="width:18%" onclick="srt('open','name',this)">Account <span class="si">↕</span></th>
+              <th style="width:7%" onclick="srt('open','size',this)">Size <span class="si">↕</span></th>
+              <th style="width:13%" onclick="srt('open','stage',this)">Stage <span class="si">↕</span></th>
+              <th style="width:9%" onclick="srt('open','fc',this)">Forecast <span class="si">↕</span></th>
+              <th style="width:7%" onclick="srt('open','amt',this)">ARR <span class="si">↕</span></th>
+              <th style="width:6%" onclick="srt('open','mrr',this)">MRR <span class="si">↕</span></th>
+              <th style="width:8%" onclick="srt('open','closedate',this)">Close date <span class="si">↕</span></th>
+              <th style="width:7%" onclick="srt('open','days',this)">Days open <span class="si">↕</span></th>
+              <th style="width:25%">Next step</th>
+            </tr></thead><tbody id="open-rows"></tbody></table></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end dashboard -->
+</div>
+
+<script>
+const WON=new Set(["1002966058","1002966059","1002823468","1002823469","1002823470","1059047578","1059047579","1059047580"]);
+const LOST=new Set(["1059151763","1002966060","appointmentscheduled"]);
+const CUTOFF=new Date("2025-10-06");
+const TODAY=new Date();
+const MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+const SL={
+  "appointmentscheduled":"Deferred Sales",
+  "qualifiedtobuy":"Marketing Handover",
+  "presentationscheduled":"Initial Demo Chase",
+  "decisionmakerboughtin":"Initial Demo Booked",
+  "contractsent":"In-Depth Demo Chase",
+  "closedwon":"In-Depth Demo Booked",
+  "1002966057":"Contract Negotiation",
+  "1002966058":"Closed Won",
+  "1002966059":"Implementation Handover",
+  "1002966060":"Close Lost - Refer Deferred",
+  "1002823467":"Deferred Implementation",
+  "1002823468":"Implementation Queue",
+  "1002823469":"Implementation Initiated",
+  "1002823470":"Live",
+  "1002823471":"Churn",
+  "1059151763":"Disqualified",
+  "1059081802":"Deferred Implementation",
+  "1059047578":"Implementation Queue",
+  "1059047579":"Implementation Initiated",
+  "1059047580":"Live",
+  "1059047581":"Churn",
+  "closedlost":"Push to Close Deal",
+};
+const FCL={"COMMIT":"Commit","MOST LIKELY":"Most Likely","BEST_CASE":"Best Case","PIPELINE":"Pipeline","OMIT":"Omit","CLOSED":"Closed","":"—"};
+const FCC={"COMMIT":"fc-commit","MOST LIKELY":"fc-most","BEST_CASE":"fc-best","PIPELINE":"fc-pipeline"};
+const LR=["Pricing","Product Gap","Timing","No response","Unqualified"];
+const LC={"Pricing":"#E24B4A","Product Gap":"#7F77DD","Timing":"#EF9F27","No response":"#888780","Unqualified":"#B4B2A9"};
+const SZO=["SMB","Medium+","Mid-Market","Enterprise"];
+
+const DC={
+  59173002540:54069123456,59171693333:30251467448,59171679087:38668575234,59149481529:53948705332,
+  59018159917:53883580986,58295874133:34112561709,58134644580:29318292825,57941135001:34380787839,
+  57865664259:51369074306,57865089823:42184672066,57855903330:30731894849,57746754624:42179536241,
+  57451847459:29303355788,57347081569:52707098185,57093650361:52234239850,56896712804:34372746639,
+  56611128179:42081950811,56611005261:42215873029,56289503094:49513313833,56200405084:42179598688,
+  55475164967:31172873338,55478494842:29314016409,55200049288:34087256597,55307860234:49745435232,
+  55261285279:34346351507,55200012417:30271026009,55299355795:29331770932,54955883059:49919865146,
+  54735679368:29334102529,54729390174:29310743059,54610055719:44672168578,54267873383:49866222977,
+  54223513524:49419788852,54223510038:34513968676,54166947168:34046465626,54128066376:46499470773,
+  53999237253:49194524277,53998918534:49162229904,53945819498:29334257180,53393846186:29299275688,
+  53388677305:46499534152,53014772295:34112932768,53260576825:48111487882,51340191405:30267801968,
+  47720987519:43038701066,46709565865:32862935138,45144589225:40796411776,45144520503:40756620696,
+  43697646947:34095245701,43163715405:34112563755,43157479946:38982879499,43743093539:39614641560,
+  42089835341:37965051233,41348617897:37101061400,40982044074:29294846847,40715669852:36651011208,
+  40735762708:36651024290,40408255606:36370826594,39510900488:35594612824,38950409796:29295836589,
+  38693612058:34888677552,38821896486:37000541618,38727644074:34925568035,35807214338:32095806211,
+  34797805320:31185036706,34798000945:48895712547,34256214603:42100896630,34229118257:30661964893,
+  33759302494:30231939181,33723391920:30195842913,33723390488:51031799825,33724685599:30223885607,
+  33741890340:30223885226,33741889938:30211596378,33628464172:30104749670,33633806243:30111135807,
+  33633805612:30345676446,33633426222:30104374833,33628457036:30313012116,39256525952:29294846748,
+};
+const CO={
+  53948705332:{size:"SMB",seg:"Local Leader B",pos:""},53883580986:{size:"SMB",seg:"DEF",pos:""},
+  52234239850:{size:"SMB",seg:"Local Leader",pos:"Lightspeed"},49919865146:{size:"SMB",seg:"DEF",pos:""},
+  49513313833:{size:"SMB",seg:"Local Leader B",pos:""},49419788852:{size:"SMB",seg:"DEF",pos:""},
+  49194524277:{size:"SMB",seg:"Local Expanders B",pos:""},49162229904:{size:"SMB",seg:"Local Leader",pos:""},
+  48111487882:{size:"SMB",seg:"Local Leader B",pos:"The Edge"},43038701066:{size:"SMB",seg:"Local Leader",pos:"Diamond Counter"},
+  42184672066:{size:"Medium+",seg:"Premium Luxury B",pos:"Bransom"},42179536241:{size:"SMB",seg:"Local Leader",pos:"Pursuit"},
+  42179598688:{size:"Medium+",seg:"Premium Luxury B",pos:"Pursuit"},42215873029:{size:"Medium+",seg:"Local Expanders A",pos:"Pursuit"},
+  51369074306:{size:"Medium+",seg:"Premium Luxury B",pos:"Encore/Anagram"},42081950811:{size:"Medium+",seg:"Premium Luxury B",pos:"Pursuit"},
+  40756620696:{size:"SMB",seg:"Local Leader B",pos:"The Edge"},40796411776:{size:"Medium+",seg:"Premium Luxury B",pos:"ASC"},
+  38982879499:{size:"SMB",seg:"Local Leader B",pos:"Jewel360"},38668575234:{size:"SMB",seg:"Local Leader B",pos:"The Edge"},
+  37965051233:{size:"SMB",seg:"Local Leader",pos:"Other"},37101061400:{size:"SMB",seg:"Local Leader B",pos:"Shopify POS"},
+  36651011208:{size:"SMB",seg:"DEF",pos:""},36651024290:{size:"SMB",seg:"DEF",pos:"Shopify POS"},
+  36370826594:{size:"SMB",seg:"DEF",pos:""},32862935138:{size:"Mid-Market",seg:"Premium Luxury A",pos:""},
+  31172873338:{size:"SMB",seg:"Local Leader B",pos:""},30731894849:{size:"Medium+",seg:"Premium Luxury B",pos:"Encore/Anagram"},
+  30267801968:{size:"SMB",seg:"Local Leader B",pos:"QuickBooks POS"},30271026009:{size:"SMB",seg:"Local Leader",pos:""},
+  30251467448:{size:"SMB",seg:"DEF",pos:""},30195842913:{size:"Mid-Market",seg:"Regional Expanders",pos:"Oracle"},
+  29299275688:{size:"SMB",seg:"Local Leader",pos:""},29318292825:{size:"SMB",seg:"Local Leader",pos:""},
+  29334257180:{size:"SMB",seg:"Local Expanders B",pos:"ASC"},44672168578:{size:"SMB",seg:"Local Leader",pos:"The Edge"},
+  52707098185:{size:"SMB",seg:"DEF",pos:""},34087256597:{size:"Medium+",seg:"Local Expanders B",pos:""},
+  29314016409:{size:"SMB",seg:"Local Leader",pos:"The Edge"},46499534152:{size:"Enterprise",seg:"S1 A",pos:""},
+  34513968676:{size:"Medium+",seg:"Local Expanders A",pos:"ASC"},34346351507:{size:"SMB",seg:"Local Leader B",pos:""},
+  29303355788:{size:"SMB",seg:"Local Leader B",pos:"The Edge"},46499470773:{size:"SMB",seg:"Local Leader",pos:""},
+  29294846847:{size:"SMB",seg:"DEF",pos:""},29331770932:{size:"SMB",seg:"Local Leader B",pos:"The Edge"},
+  29310743059:{size:"SMB",seg:"Local Leader B",pos:""},34046465626:{size:"SMB",seg:"Local Leader",pos:"The Edge"},
+  34095245701:{size:"Mid-Market",seg:"Premium Luxury A",pos:"ARMS"},29334102529:{size:"SMB",seg:"Local Expanders B",pos:""},
+  34372746639:{size:"Mid-Market",seg:"Premium Luxury A",pos:"Diaspark"},34112561709:{size:"Medium+",seg:"Premium Luxury B",pos:""},
+  34380787839:{size:"Medium+",seg:"Premium Luxury B",pos:"The Edge"},39614641560:{size:"SMB",seg:"Local Leader",pos:"Other"},
+  49745435232:{size:"Medium+",seg:"Regional Expander B",pos:"ASC"},49866222977:{size:"SMB",seg:"DEF",pos:"The Edge"},
+  34112932768:{size:"Medium+",seg:"Regional Expander B",pos:"LogicMate"},35594612824:{size:"SMB",seg:"Local Leader",pos:"Bransom"},
+  34925568035:{size:"SMB",seg:"",pos:""},32095806211:{size:"Medium+",seg:"Regional Expanders",pos:"The Edge"},
+  42100896630:{size:"Medium+",seg:"Premium Luxury A",pos:"Bransom"},30661964893:{size:"SMB",seg:"Local Leader",pos:"Pursuit"},
+  30231939181:{size:"SMB",seg:"",pos:""},48895712547:{size:"Medium+",seg:"Premium Luxury B",pos:"The Edge"},
+  37000541618:{size:"SMB",seg:"Local Expanders B",pos:"Lightspeed"},30111135807:{size:"Medium+",seg:"Premium Luxury B",pos:"The Edge"},
+  30223885607:{size:"Medium+",seg:"Premium Luxury B",pos:"ASC"},30223885226:{size:"SMB",seg:"Local Expanders B",pos:"WinJewel"},
+  51031799825:{size:"Medium+",seg:"Premium Luxury B",pos:"ASC"},30211596378:{size:"SMB",seg:"Local Leader",pos:""},
+  29295836589:{size:"SMB",seg:"DEF",pos:"ARMS"},29294846748:{size:"SMB",seg:"Local Leader",pos:""},
+  34112563755:{size:"Medium+",seg:"Premium Luxury B",pos:"The Edge"},
+  34888677552:{size:"SMB",seg:"",pos:"Other"},30104749670:{size:"SMB",seg:"",pos:"The Edge"},
+  30345676446:{size:"SMB",seg:"",pos:"Excel/Spreadsheets"},30104374833:{size:"Medium+",seg:"",pos:"DCIT/BusinessMind"},
+  30313012116:{size:"Mid-Market",seg:"",pos:"ASC"},31185036706:{size:"Medium+",seg:"",pos:"Lightspeed"},
+};
+
+let allDeals=[],deals=[],allSegs=[],curDim="size",charts={},sortSt={};
+
+// ── Helpers ──────────────────────────────────────────────────
+// Status: determined entirely by dealstage — no date logic needed
+function gs(stage) {
+  if (WON.has(stage)) return "Won";
+  if (LOST.has(stage)) return "Lost";
+  return "Open";
+}
+// CUTOFF used only in default "all time" filter
+const dys=(cd,cl,st)=>{if(!cd)return 0;const e=(st!=="Open"&&cl)?new Date(cl):TODAY;return Math.round((e-new Date(cd))/864e5);};
+const avg=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):0;
+const fd=s=>{if(!s)return"—";const d=new Date(s);return(d.getMonth()+1)+"/"+d.getDate()+"/"+String(d.getFullYear()).slice(2);};
+const fa=n=>"$"+Math.round(n).toLocaleString();
+const fmrr=n=>Math.round(n/12);
+function dch(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function mk(id,cfg){dch(id);charts[id]=new Chart(document.getElementById(id),cfg);}
+
+function calc2026(d){
+  if(!d.soft_launch)return 0;
+  const sl=new Date(d.soft_launch);
+  if(isNaN(sl)||sl.getFullYear()>2026)return 0;
+  const mo=sl.getFullYear()<2026?0:sl.getMonth()+1;
+  return fmrr(d.amt)*Math.max(0,12-mo);
+}
+
+// ── Navigation ──────────────────────────────────────────────
+function showSec(id,el){
+  document.querySelectorAll('.sec-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+}
+function showView(id,navId,el){
+  document.querySelectorAll('#'+navId+' .sub-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  // find all sibling views in same parent section
+  el.closest('.sec').querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── Filters ──────────────────────────────────────────────────
+function dateInPeriod(dateStr, p) {
+  if (!p || p === "all") return true;
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return false;
+  const y = d.getFullYear(), m = d.getMonth();
+  if (p === "fy26") return y === 2026;
+  if (p === "q1-26") return y === 2026 && m <= 2;
+  if (p === "q2-26") return y === 2026 && m >= 3 && m <= 5;
+  if (p === "q3-26") return y === 2026 && m >= 6 && m <= 8;
+  if (p === "q4-25") return y === 2025 && m >= 9;
+  // Monthly: "2026-04"
+  if (p.match(/^\d{4}-\d{2}$/)) {
+    const [py, pm] = p.split('-').map(Number);
+    return y === py && m === pm - 1;
+  }
+  return true;
+}
+
+// Per-section deal sets
+const sectionDeals = { ov: [], an: [], rv: [] };
+
+function getFiltered(sec) {
+  const g = id => document.getElementById(id+'-'+sec)?.value || '';
+  const created = g('gf-created'), closing = g('gf-closing');
+  const sz = g('gf-sz'), sg = g('gf-sg'), owner = g('gf-owner');
+  // Deal Analysis section supports Competitor (multi) and Outcome (multi) filters
+  const comps = selectedMulti('gf-comp-'+sec);
+  const outcomes = selectedMulti('gf-outcome-'+sec);
+  return allDeals.filter(d => {
+    if (d.dealtype !== 'newbusiness') return false;  // Renewals/Expansion shown in dedicated section
+    if (created === "all" && closing === "all") {
+      if (d.status !== "Open" && d.closedate && new Date(d.closedate) < CUTOFF) return false;
+    }
+    if (created !== "all" && !dateInPeriod(d.createdate, created)) return false;
+    if (closing !== "all") {
+      if (d.status === "Open" && !d.closedate) {/* always show */}
+      else if (!dateInPeriod(d.closedate, closing)) return false;
+    }
+    if (sz && d.size !== sz) return false;
+    if (sg && d.seg  !== sg) return false;
+    if (owner && d.owner !== owner) return false;
+    if (comps.length && !comps.some(c => d.compList.includes(c))) return false;
+    if (outcomes.length && !outcomes.includes(d.status)) return false;
+    return true;
+  });
+}
+
+// Returns array of selected values from a multi-chip filter
+function selectedMulti(id) {
+  const el = document.getElementById(id);
+  if (!el) return [];
+  return Array.from(el.querySelectorAll('.chip.active')).map(c => c.dataset.val);
+}
+
+function applyFilters(sec) {
+  sectionDeals[sec] = getFiltered(sec);
+
+  // Build summary label
+  const g  = id => document.getElementById(id+'-'+sec);
+  const gv = id => g(id)?.value || '';
+  const pts = [];
+  const created = gv('gf-created'), closing = gv('gf-closing');
+  const sz = gv('gf-sz'), sg = gv('gf-sg');
+  if (created !== 'all') pts.push('Created: ' + g('gf-created').selectedOptions[0].text);
+  if (closing !== 'all') pts.push('Closing: ' + g('gf-closing').selectedOptions[0].text);
+  if (sz) pts.push(sz);
+  if (sg) pts.push(sg);
+  const ownerEl = g('gf-owner');
+  if (ownerEl?.value) pts.push(ownerEl.selectedOptions[0].text);
+  const activeComps = selectedMulti('gf-comp-'+sec);
+  if (activeComps.length) pts.push('Comp: ' + activeComps.join(', '));
+  const activeOutcomes = selectedMulti('gf-outcome-'+sec);
+  if (activeOutcomes.length) pts.push('Outcome: ' + activeOutcomes.join(', '));
+  updateFilterSummary(sec, pts);
+
+  // Highlight active selects
+  ['gf-created','gf-closing','gf-sz','gf-sg','gf-owner'].forEach(id => {
+    const el = g(id); if (!el) return;
+    const isDefault = el.value === 'all' || el.value === '' || (id === 'gf-closing' && el.value === 'q2-26');
+    el.classList.toggle('filter-active', !isDefault);
+  });
+
+  if (sec === 'ov') renderOverview(sectionDeals.ov);
+  if (sec === 'an') renderAnalysis(sectionDeals.an);
+  if (sec === 'rv') renderRevenue(sectionDeals.rv);
+}
+
+// ── Sort ────────────────────────────────────────────────────
+function srt(tbl,key,el){
+  const st=sortSt[tbl]||{};
+  const dir=(st.key===key&&st.dir==="asc")?"desc":"asc";
+  sortSt[tbl]={key,dir};
+  el.closest('table').querySelectorAll('th').forEach(th=>{
+    th.classList.remove('sa','sd');
+    const si=th.querySelector('.si');if(si)si.textContent='↕';
+  });
+  el.classList.add(dir==="asc"?"sa":"sd");
+  const si=el.querySelector('.si');if(si)si.textContent=dir==="asc"?"↑":"↓";
+  renderAll();
+}
+function sorted(list,tbl){
+  const st=sortSt[tbl];if(!st)return list;
+  return[...list].sort((a,b)=>{
+    let va=a[st.key]??'',vb=b[st.key]??'';
+    if(['amt','days','mrr','rev2026','impl_amt_n'].includes(st.key)){va=Number(va)||0;vb=Number(vb)||0;}
+    else{va=String(va).toLowerCase();vb=String(vb).toLowerCase();}
+    if(va<vb)return st.dir==="asc"?-1:1;
+    if(va>vb)return st.dir==="asc"?1:-1;
+    return 0;
+  });
+}
+
+// ── Filter toggle ──────────────────────────────────────────
+function toggleFilters(sec) {
+  const panel = document.getElementById('filter-panel-'+sec);
+  const btn   = document.getElementById('filter-toggle-btn-'+sec);
+  const caret = document.getElementById('filter-caret-'+sec);
+  const open  = panel.style.display === 'none';
+  panel.style.display = open ? 'block' : 'none';
+  btn.classList.toggle('open', open);
+  caret.classList.toggle('open', open);
+}
+
+function resetFilters(sec) {
+  document.getElementById('gf-created-'+sec).value = 'all';
+  document.getElementById('gf-closing-'+sec).value = 'q2-26';
+  document.getElementById('gf-sz-'+sec).value = '';
+  document.getElementById('gf-sg-'+sec).value = '';
+  document.getElementById('gf-owner-'+sec).value = '';
+  ['gf-comp-'+sec, 'gf-outcome-'+sec].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  });
+  applyFilters(sec);
+}
+
+function toggleChip(el, sec) {
+  el.classList.toggle('active');
+  applyFilters(sec);
+}
+
+function updateFilterSummary(sec, pts) {
+  const el = document.getElementById('filter-summary-'+sec);
+  if (el) el.textContent = pts.length ? pts.join(' · ') : 'No filters applied';
+}
+
+// ── Weekly Summary ─────────────────────────────────────────────
+function toggleWeekly() {
+  const body = document.getElementById('week-body');
+  const caret = document.getElementById('week-caret');
+  body.classList.toggle('open');
+  caret.classList.toggle('open');
+}
+
+function renderWeekly() {
+  // Rolling 7 days forward from today
+  const now = new Date();
+  const today = now.toISOString().slice(0,10);
+  const in7 = new Date(now.getTime() + 7*864e5).toISOString().slice(0,10);
+  const ago7 = new Date(now.getTime() - 7*864e5).toISOString().slice(0,10);
+
+  // Range label
+  const fmtShort = d => {
+    const x = new Date(d);
+    return (x.getMonth()+1) + '/' + x.getDate();
+  };
+  document.getElementById('week-range').textContent = `(${fmtShort(today)} → ${fmtShort(in7)})`;
+
+  // Only consider new business deals for closing & demos (renewals have their own section)
+  const newBiz = allDeals.filter(d => d.dealtype === 'newbusiness');
+  const renewals = allDeals.filter(d => d.dealtype === 'Renewal' || d.dealtype === 'existingbusiness');
+
+  // 1. Closing this week — open deals with close date in next 7 days
+  const closingThisWeek = newBiz.filter(d =>
+    d.status === 'Open' && d.closedate && d.closedate >= today && d.closedate <= in7
+  ).sort((a,b) => a.closedate.localeCompare(b.closedate));
+
+  // 2. New demos scheduled — deals where stage = Initial Demo Booked or In-Depth Demo Booked AND created in last 7 days
+  const demoStages = new Set(['decisionmakerboughtin', 'closedwon']);
+  const newDemos = newBiz.filter(d =>
+    demoStages.has(d.stage) && d.createdate >= ago7
+  ).sort((a,b) => b.createdate.localeCompare(a.createdate));
+
+  // 3. Upcoming renewals — open renewals with close date in next 7 days
+  const upcomingRenewals = renewals.filter(d =>
+    d.status === 'Open' && d.closedate && d.closedate >= today && d.closedate <= in7
+  ).sort((a,b) => a.closedate.localeCompare(b.closedate));
+
+  // 4. Next steps due this week
+  const nextSteps = newBiz.filter(d =>
+    d.nextstepdate && d.nextstepdate >= today && d.nextstepdate <= in7 && d.status === 'Open'
+  ).sort((a,b) => a.nextstepdate.localeCompare(b.nextstepdate));
+
+  // 5. Stalled deals — open, no activity 14+ days (using createdate-closedate > 14 AND no nextstepdate or nextstepdate < today)
+  const stalled = newBiz.filter(d => {
+    if (d.status !== 'Open') return false;
+    if (!d.nextstepdate) return d.days > 14;
+    return d.nextstepdate < today;
+  }).sort((a,b) => b.days - a.days).slice(0, 10);
+
+  // 6. New deals this week
+  const newDeals = newBiz.filter(d => d.createdate >= ago7)
+    .sort((a,b) => b.createdate.localeCompare(a.createdate));
+
+  const bucket = (title, items, renderLine, emptyMsg='Nothing this week') => `
+    <div class="week-bucket">
+      <div class="week-bucket-title">
+        <span>${title}</span>
+        <span class="week-bucket-count">${items.length}</span>
+      </div>
+      ${items.length === 0
+        ? `<div class="week-bucket-empty">${emptyMsg}</div>`
+        : `<ul>${items.map(renderLine).join('')}</ul>`}
+    </div>`;
+
+  document.getElementById('week-body').innerHTML = `
+    <div class="week-grid">
+      ${bucket('Closing this week', closingThisWeek, d => `<li><span>${d.name}</span><span class="wb-sub">${fd(d.closedate)} · ${fa(d.amt)}</span></li>`)}
+      ${bucket('Next steps due', nextSteps, d => `<li><span>${d.name}</span><span class="wb-sub">${fd(d.nextstepdate)}</span></li>`)}
+      ${bucket('New deals created', newDeals, d => `<li><span>${d.name}</span><span class="wb-sub">${fd(d.createdate)}</span></li>`)}
+      ${bucket('New demos booked', newDemos, d => `<li><span>${d.name}</span><span class="wb-sub">${SL[d.stage]||''}</span></li>`)}
+      ${bucket('Upcoming renewals', upcomingRenewals, d => `<li><span>${d.name}</span><span class="wb-sub">${fd(d.closedate)} · ${fa(d.amt)}</span></li>`)}
+      ${bucket('Stalled deals', stalled, d => `<li><span>${d.name}</span><span class="wb-sub">${d.days}d · ${SL[d.stage]||''}</span></li>`, 'No stalled deals')}
+    </div>`;
+}
+
+// ── Load ────────────────────────────────────────────────────
+async function loadData(){
+  const btn=document.getElementById('btn-r');
+  btn.disabled=true;btn.textContent='↻ Refreshing...';
+  document.getElementById('loading').style.display='block';
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('err').style.display='none';
+  try{
+    const ctrl=new AbortController();
+    const t=setTimeout(()=>ctrl.abort(),30000);
+    let res;
+    try{res=await fetch('/api/hubspot?endpoint=deals',{signal:ctrl.signal});clearTimeout(t);}
+    catch(e){clearTimeout(t);throw new Error('Request timed out.');}
+    if(!res.ok)throw new Error('HubSpot error: '+res.status);
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+
+    allDeals=(data.results||[]).map(d=>{
+      const p=d.properties;
+      const cid=DC[d.id];
+      const co=CO[cid]||{size:'',seg:'',pos:''};
+      const cd=p.createdate?p.createdate.slice(0,10):'';
+      const cl=p.closedate?p.closedate.slice(0,10):'';
+      const status=gs(p.dealstage);
+      const amt=parseFloat(p.amount)||0;
+      // Parse implementation amount — strip "$" and commas
+      const impl_raw=p.implementation_amount||'';
+      const impl_amt_n=parseFloat(impl_raw.replace(/[$,]/g,''))||0;
+      return{
+        id:d.id,
+        name:p.dealname.replace(/ - 20\d\d.*$/,'').replace(/ - New Deal$/,''),
+        stage:p.dealstage,status,
+        amt,mrr:fmrr(amt),createdate:cd,closedate:cl,
+        reasons:p.close_lost_reason||'',details:p.closed_lost_details||'',
+        comps:p.competitors||'',lostto:p.lost_to||'',
+        fc:p.hs_manual_forecast_category||'',tch:parseInt(p.num_contacted_notes)||0,
+        nextstep:(p.hs_next_step||'').trim().replace(/^[=\s]+$/, ''),wonreason:p.closed_won_reason||'',
+        soft_launch:p.soft_launch_date||'',golive:p.golive_date||'',
+        nextstepdate:p.next_step_date||'',
+        owner:p.hubspot_owner_id||'',
+        dealtype:p.dealtype||'newbusiness',
+        impl_amt:impl_raw,impl_amt_n,
+        size:co.size,seg:co.seg,pos:co.pos,
+        compList:p.competitors?p.competitors.split(';').map(x=>x.trim()).filter(Boolean):[],
+        days:dys(cd,cl,status),
+      };
+    }); // load all deals, filtering handled by applyFilters
+
+
+    // Initialize all three sections with independent defaults
+    // Overview: Closing Q2 2026
+    document.getElementById('gf-created-ov').value = 'all';
+    document.getElementById('gf-closing-ov').value = 'q2-26';
+    // Analysis: All time
+    document.getElementById('gf-created-an').value = 'all';
+    document.getElementById('gf-closing-an').value = 'all';
+    // Revenue: All time
+    document.getElementById('gf-created-rv').value = 'all';
+    document.getElementById('gf-closing-rv').value = 'all';
+
+    // Update segmentation dropdowns for all sections
+    allSegs=[...new Set(allDeals.map(d=>d.seg).filter(Boolean))].sort();
+    ['ov','an','rv'].forEach(sec => {
+      const el = document.getElementById('gf-sg-'+sec);
+      if (el) el.innerHTML = '<option value="">All</option>' +
+        allSegs.map(s=>`<option>${s}</option>`).join('');
+    });
+
+    // Populate competitor chips on Deal Analysis
+    const allComps = [...new Set(allDeals.flatMap(d=>d.compList))].sort();
+    const compEl = document.getElementById('gf-comp-an');
+    if (compEl) compEl.innerHTML = allComps.map(c =>
+      `<span class="chip" data-val="${c}" onclick="toggleChip(this, 'an')">${c}</span>`
+    ).join('');
+
+    // Apply filters to all three sections
+    sectionDeals.ov = getFiltered('ov');
+    sectionDeals.an = getFiltered('an');
+    sectionDeals.rv = getFiltered('rv');
+    ['ov','an','rv'].forEach(sec => updateFilterSummary(sec,
+      document.getElementById('gf-closing-'+sec).value !== 'all'
+        ? ['Closing: '+document.getElementById('gf-closing-'+sec).selectedOptions[0].text]
+        : []
+    ));
+    renderAll();
+    document.getElementById('loading').style.display='none';
+    document.getElementById('dashboard').style.display='block';
+    document.getElementById('last-updated').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  }catch(err){
+    document.getElementById('loading').style.display='none';
+    const e=document.getElementById('err');
+    e.style.display='block';e.textContent='Error: '+err.message;
+  }
+  btn.disabled=false;btn.textContent='↻ Refresh';
+}
+
+// ── Render ──────────────────────────────────────────────────
+function renderOverview(deals) {
+  const won=deals.filter(d=>d.status==="Won");
+  const lost=deals.filter(d=>d.status==="Lost");
+  const open=deals.filter(d=>d.status==="Open");
+  const closed=[...won,...lost];
+  const wonVal=won.reduce((a,d)=>a+d.amt,0);
+  const openVal=open.reduce((a,d)=>a+d.amt,0);
+  const wr=closed.length?Math.round(won.length/closed.length*100):0;
+  const avgWD=avg(won.map(d=>d.days));
+  // breakdown by size for total deals
+  const szBreak=SZO.filter(s=>deals.some(d=>d.size===s)).map(s=>`${s}: ${deals.filter(d=>d.size===s).length}`).join(' · ');
+  const statusBreak=`${open.length} open · ${won.length} won · ${lost.length} lost`;
+
+  // Forecast category ARR totals (open deals only)
+  const fcSegs = [
+    {key:'COMMIT',      label:'Commit',      color:'#4caf72'},
+    {key:'MOST LIKELY', label:'Most Likely', color:'#5b9ef7'},
+    {key:'BEST_CASE',   label:'Best Case',   color:'#e8a030'},
+    {key:'PIPELINE',    label:'Pipeline',    color:'#7c6af7'},
+  ];
+  const fcData = fcSegs.map(s=>({
+    ...s,
+    amt: open.filter(d=>d.fc===s.key).reduce((a,d)=>a+d.amt,0),
+    n:   open.filter(d=>d.fc===s.key).length,
+  }));
+  const fcTotal = fcData.reduce((a,s)=>a+s.amt,0);
+
+  // Expansion and Renewal totals (from allDeals, use same filter period)
+  const expansionDeals = allDeals.filter(d => d.dealtype === 'existingbusiness' && d.status === 'Won');
+  const renewalDeals   = allDeals.filter(d => d.dealtype === 'Renewal' && d.status === 'Won');
+  const expArr = expansionDeals.reduce((a,d)=>a+d.amt,0);
+  const renArr = renewalDeals.reduce((a,d)=>a+d.amt,0);
+
+  document.getElementById('m-top').innerHTML=`
+    <div class="metric"><div class="lbl">Total deals</div><div class="val">${deals.length}</div><div class="breakdown">${statusBreak}</div><div class="breakdown" style="margin-top:2px">${szBreak}</div></div>
+    <div class="metric"><div class="lbl">New-business ARR</div><div class="val">${fa(wonVal)}</div><div class="sub">${won.length} deals won</div></div>
+    <div class="metric"><div class="lbl">Total Pipeline</div><div class="val">${fa(openVal)}</div><div class="sub">${open.length} active deals</div></div>
+    <div class="metric"><div class="lbl">Win rate</div><div class="val">${wr}%</div><div class="sub">${won.length}W · ${lost.length}L of ${closed.length}</div></div>
+    <div class="metric"><div class="lbl">Expansion ARR</div><div class="val">${fa(expArr)}</div><div class="sub">${fa(expArr/12)}/mo MRR · ${expansionDeals.length} deals</div></div>
+    <div class="metric"><div class="lbl">Renewal ARR</div><div class="val">${fa(renArr)}</div><div class="sub">${fa(renArr/12)}/mo MRR · ${renewalDeals.length} deals</div></div>
+  `;
+
+  // Forecast second-tier metric cards with avg days to close
+  document.getElementById('m-forecast').innerHTML = fcSegs.map(s => {
+    const segDeals = open.filter(d=>d.fc===s.key);
+    const amt = segDeals.reduce((a,d)=>a+d.amt,0);
+    const n   = segDeals.length;
+    // Avg days remaining to close date
+    const today = new Date();
+    const withClose = segDeals.filter(d=>d.closedate);
+    const avgDays = withClose.length
+      ? Math.round(withClose.reduce((a,d)=>a+Math.max(0,Math.round((new Date(d.closedate)-today)/864e5)),0)/withClose.length)
+      : null;
+    const daysLabel = avgDays !== null ? `avg ${avgDays}d to close` : `${n} deal${n!==1?'s':''}`;
+    return `<div class="metric fc-metric" style="border-left:3px solid ${s.color}">
+      <div class="lbl">${s.label}</div>
+      <div class="val" style="font-size:18px">${fa(amt)}</div>
+      <div class="sub">${n} deal${n!==1?'s':''} · ${daysLabel}</div>
+    </div>`;
+  }).join('');
+
+  // Overview open deals
+  const ovO=sorted(open.sort((a,b)=>new Date(a.closedate||'2099')-new Date(b.closedate||'2099')),'ov-open');
+  const FC_ROW_COLOR = {'COMMIT':'#4caf72','MOST LIKELY':'#5b9ef7','BEST_CASE':'#e8a030','PIPELINE':'#7c6af7'};
+  document.getElementById('ov-open-rows').innerHTML=ovO.map(d=>{
+    const isPastDue=d.closedate&&d.closedate<new Date().toISOString().slice(0,10);
+    const rowBorder=FC_ROW_COLOR[d.fc]?`border-left:3px solid ${FC_ROW_COLOR[d.fc]}`:'border-left:3px solid transparent';
+    return`<tr style="${rowBorder}">
+    <td>${d.name}</td>
+    <td>${isPastDue?`<span class="badge b-warn">⚠ ${fd(d.closedate)}</span>`:fd(d.closedate)}</td>
+    <td>${fa(d.amt)}</td><td>${fa(d.mrr)}</td>
+    <td style="color:var(--text2)">${d.impl_amt||'—'}</td>
+    <td style="font-size:11px;color:var(--text2)">${SL[d.stage]||d.stage}</td>
+    <td><span class="badge ${FCC[d.fc]||'b-neutral'}">${FCL[d.fc]||'—'}</span></td>
+    <td>${fd(d.golive)}</td>
+    <td>${fd(d.soft_launch)}</td>
+    <td>${fd(d.nextstepdate)}</td>
+  </tr>`;}).join('');
+
+  // Overview won deals
+  const ovW=sorted(won,'ov-won');
+  document.getElementById('ov-won-rows').innerHTML=ovW.map(d=>`<tr>
+    <td>${d.name}</td><td>${d.size}</td><td>${d.seg||'—'}</td>
+    <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.comps||'—'}</td>
+    <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.wonreason||'—'}</td>
+    <td>${fa(d.amt)}</td><td>${fa(d.mrr)}</td><td>${fd(d.closedate)}</td>
+  </tr>`).join('');
+
+  // Overview lost deals
+  const ovL=sorted(lost.sort((a,b)=>new Date(b.closedate||'0')-new Date(a.closedate||'0')),'ov-lost');
+  document.getElementById('ov-lost-rows').innerHTML=ovL.map(d=>`<tr>
+    <td>${d.name}</td><td>${d.size}</td><td>${d.seg||'—'}</td>
+    <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.lostto||'—'}</td>
+    <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.reasons||'—'}</td>
+    <td>${fa(d.amt)}</td><td>${fa(d.mrr)}</td><td>${fd(d.closedate)}</td>
+  </tr>`).join('');
+
+  mk('c-seg',{type:'bar',data:{labels:SZO,datasets:[
+    {label:'Won',data:SZO.map(s=>won.filter(d=>d.size===s).reduce((a,d)=>a+d.amt,0)),backgroundColor:'#4caf72',borderRadius:3},
+    {label:'Lost',data:SZO.map(s=>lost.filter(d=>d.size===s).reduce((a,d)=>a+d.amt,0)),backgroundColor:'#e05252',borderRadius:3},
+    {label:'Open',data:SZO.map(s=>open.filter(d=>d.size===s).reduce((a,d)=>a+d.amt,0)),backgroundColor:'#5b9ef7',borderRadius:3},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fa(c.raw)}}},
+    scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#d0d0cc'}},y:{stacked:true,ticks:{callback:v=>'$'+Math.round(v/1000)+'K',color:'#d0d0cc'},grid:{color:'rgba(255,255,255,0.06)'}}}}});
+  mk('c-wr',{type:'bar',data:{labels:SZO,datasets:[{data:SZO.map(s=>{const p=closed.filter(d=>d.size===s);return p.length?Math.round(p.filter(d=>d.status==='Won').length/p.length*100):0;}),backgroundColor:['#D4537E','#7F77DD','#1D9E75','#5b9ef7'],borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'%'}}},
+      scales:{x:{grid:{display:false},ticks:{color:'#d0d0cc'}},y:{max:60,ticks:{callback:v=>v+'%',color:'#d0d0cc'},grid:{color:'rgba(255,255,255,0.06)'}}}}});
+}
+
+function renderAnalysis(deals) {
+  const won=deals.filter(d=>d.status==="Won");
+  const lost=deals.filter(d=>d.status==="Lost");
+  const open=deals.filter(d=>d.status==="Open");
+  const closed=[...won,...lost];
+  const avgWD=avg(won.map(d=>d.days));
+
+  // Loss reasons
+  const lrc=LR.map(r=>deals.filter(d=>d.reasons&&d.reasons.split(';').map(x=>x.trim()).includes(r)).length);
+  mk('c-loss',{type:'doughnut',data:{labels:LR,datasets:[{data:lrc,backgroundColor:LR.map(r=>LC[r]),borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#d0d0cc',font:{size:11},boxWidth:10,padding:8}}}}});
+  const ltM={};deals.filter(d=>d.lostto).forEach(d=>{ltM[d.lostto]=(ltM[d.lostto]||0)+1;});
+  const ltS=Object.entries(ltM).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('c-lostto-w').style.height=(ltS.length*36+50)+'px';
+  mk('c-lostto',{type:'bar',data:{labels:ltS.map(x=>x[0]),datasets:[{data:ltS.map(x=>x[1]),backgroundColor:'#e05252',borderRadius:3}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      onClick:(e,els,chart)=>{if(els.length){chartClickAddComp(chart.data.labels[els[0].index]);}},
+      onHover:(e,els)=>{e.native.target.style.cursor=els.length?'pointer':'default';},
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'rgba(255,255,255,0.06)'},ticks:{stepSize:1,color:'#d0d0cc'}},y:{grid:{display:false},ticks:{color:'#d0d0cc'}}}}});
+  mk('c-losssz',{type:'bar',data:{labels:SZO,datasets:LR.map(r=>({label:r,data:SZO.map(s=>deals.filter(d=>d.size===s&&d.reasons&&d.reasons.split(';').map(x=>x.trim()).includes(r)).length),backgroundColor:LC[r],borderRadius:2}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#d0d0cc'}},y:{stacked:true,ticks:{stepSize:1,color:'#d0d0cc'},grid:{color:'rgba(255,255,255,0.06)'}}}}});
+  const vS=allSegs.filter(s=>deals.some(d=>d.seg===s&&d.reasons));
+  document.getElementById('c-lossg-w').style.height=(vS.length*36+60)+'px';
+  mk('c-lossg',{type:'bar',data:{labels:vS,datasets:LR.map(r=>({label:r,data:vS.map(s=>deals.filter(d=>d.seg===s&&d.reasons&&d.reasons.split(';').map(x=>x.trim()).includes(r)).length),backgroundColor:LC[r],borderRadius:2}))},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{stacked:true,grid:{color:'rgba(255,255,255,0.06)'},ticks:{stepSize:1,color:'#d0d0cc'}},y:{stacked:true,grid:{display:false},ticks:{color:'#d0d0cc'}}}}});
+
+  // Competitors
+  const cM={};deals.forEach(d=>d.compList.forEach(c=>{cM[c]=(cM[c]||0)+1;}));
+  const cS=Object.entries(cM).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('c-comp-w').style.height=(cS.length*36+50)+'px';
+  document.getElementById('c-compst-w').style.height=(cS.length*36+60)+'px';
+  mk('c-comp',{type:'bar',data:{labels:cS.map(x=>x[0]),datasets:[{data:cS.map(x=>x[1]),backgroundColor:'#7c6af7',borderRadius:3}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      onClick:(e,els,chart)=>{if(els.length){chartClickAddComp(chart.data.labels[els[0].index]);}},
+      onHover:(e,els)=>{e.native.target.style.cursor=els.length?'pointer':'default';},
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'rgba(255,255,255,0.06)'},ticks:{stepSize:1,color:'#d0d0cc'}},y:{grid:{display:false},ticks:{color:'#d0d0cc'}}}}});
+  mk('c-compst',{type:'bar',data:{labels:cS.map(x=>x[0]),datasets:[
+    {label:'Won',data:cS.map(x=>deals.filter(d=>d.status==='Won'&&d.compList.includes(x[0])).length),backgroundColor:'#4caf72',borderRadius:2},
+    {label:'Lost',data:cS.map(x=>deals.filter(d=>d.status==='Lost'&&d.compList.includes(x[0])).length),backgroundColor:'#e05252',borderRadius:2},
+    {label:'Open',data:cS.map(x=>deals.filter(d=>d.status==='Open'&&d.compList.includes(x[0])).length),backgroundColor:'#5b9ef7',borderRadius:2},
+  ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+    onClick:(e,els,chart)=>{if(els.length){const comp=chart.data.labels[els[0].index];const outcome=chart.data.datasets[els[0].datasetIndex].label;chartClickAddComp(comp);chartClickAddOutcome(outcome);}},
+    onHover:(e,els)=>{e.native.target.style.cursor=els.length?'pointer':'default';},
+    plugins:{legend:{display:false}},
+    scales:{x:{stacked:true,grid:{color:'rgba(255,255,255,0.06)'},ticks:{stepSize:1,color:'#d0d0cc'}},y:{stacked:true,grid:{display:false},ticks:{color:'#d0d0cc'}}}}});
+
+  // POS
+  const pM={};deals.filter(d=>d.pos&&d.pos!=='Other').forEach(d=>{pM[d.pos]=(pM[d.pos]||0)+1;});
+  const pS=Object.entries(pM).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('c-pos-w').style.height=(pS.length*36+50)+'px';
+  document.getElementById('c-posst-w').style.height=(pS.length*36+60)+'px';
+  mk('c-pos',{type:'bar',data:{labels:pS.map(x=>x[0]),datasets:[{data:pS.map(x=>x[1]),backgroundColor:'#7c6af7',borderRadius:3}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'rgba(255,255,255,0.06)'},ticks:{stepSize:1,color:'#d0d0cc'}},y:{grid:{display:false},ticks:{color:'#d0d0cc'}}}}});
+  mk('c-posst',{type:'bar',data:{labels:pS.map(x=>x[0]),datasets:[
+    {label:'Won',data:pS.map(x=>deals.filter(d=>d.pos===x[0]&&d.status==='Won').length),backgroundColor:'#4caf72',borderRadius:2},
+    {label:'Lost',data:pS.map(x=>deals.filter(d=>d.pos===x[0]&&d.status==='Lost').length),backgroundColor:'#e05252',borderRadius:2},
+    {label:'Open',data:pS.map(x=>deals.filter(d=>d.pos===x[0]&&d.status==='Open').length),backgroundColor:'#5b9ef7',borderRadius:2},
+  ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{stacked:true,grid:{color:'rgba(255,255,255,0.06)'},ticks:{stepSize:1,color:'#d0d0cc'}},y:{stacked:true,grid:{display:false},ticks:{color:'#d0d0cc'}}}}});
+
+  // Win rate matrix
+  renderMatrix();
+
+  // Velocity
+  document.getElementById('m-vel').innerHTML=`
+    <div class="metric"><div class="lbl">Avg days (won)</div><div class="val">${avg(won.map(d=>d.days))}</div><div class="sub">${won.length} won deals</div></div>
+    <div class="metric"><div class="lbl">Avg days (lost)</div><div class="val">${avg(lost.map(d=>d.days))}</div><div class="sub">${lost.length} lost deals</div></div>
+    <div class="metric"><div class="lbl">Avg touches (won)</div><div class="val">${avg(won.map(d=>d.tch))}</div><div class="sub">vs ${avg(lost.map(d=>d.tch))} on lost</div></div>
+    <div class="metric"><div class="lbl">Past avg cycle</div><div class="val">${open.filter(d=>d.days>avgWD).length}</div><div class="sub">&gt;${avgWD}d open</div></div>
+  `;
+  mk('c-vwl',{type:'bar',data:{labels:['Won','Lost'],datasets:[{data:[avg(won.map(d=>d.days)),avg(lost.map(d=>d.days))],backgroundColor:['#4caf72','#e05252'],borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+' days'}}},
+      scales:{x:{grid:{display:false},ticks:{color:'#d0d0cc'}},y:{ticks:{callback:v=>v+'d',color:'#d0d0cc'},grid:{color:'rgba(255,255,255,0.06)'}}}}});
+  mk('c-vtch',{type:'bar',data:{labels:['Won','Lost'],datasets:[{data:[avg(won.map(d=>d.tch)),avg(lost.map(d=>d.tch))],backgroundColor:['#4caf72','#e05252'],borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+' touches'}}},
+      scales:{x:{grid:{display:false},ticks:{color:'#d0d0cc'}},y:{ticks:{stepSize:5,color:'#d0d0cc'},grid:{color:'rgba(255,255,255,0.06)'}}}}});
+  document.getElementById('stale-rows').innerHTML=open.filter(d=>d.days>avgWD).sort((a,b)=>b.days-a.days).map(d=>`<tr>
+    <td>${d.name}</td><td>${d.size}</td>
+    <td style="font-size:11px;color:var(--text2)">${SL[d.stage]||d.stage}</td>
+    <td><span class="badge b-warn">${d.days}d</span></td>
+    <td>${d.tch}</td><td>${fd(d.closedate)}</td>
+    <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.compList.join(', ')||'—'}</td>
+  </tr>`).join('');
+
+  // All deals
+  const allS=sorted(deals,'all');
+  document.getElementById('all-rows').innerHTML=allS.map(d=>`<tr>
+    <td>${d.name}</td><td>${d.size}</td>
+    <td><span class="badge b-${d.status.toLowerCase()}">${d.status}</span></td>
+    <td>${fd(d.closedate)}</td>
+    <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.reasons||'—'}</td>
+    <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.wonreason||'—'}</td>
+    <td>${d.pos||'—'}</td>
+    <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.compList.join(', ')||'—'}</td>
+    <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.details||'—'}</td>
+  </tr>`).join('');
+}
+
+function renderRevenue(deals) {
+  const won=deals.filter(d=>d.status==="Won");
+  const lost=deals.filter(d=>d.status==="Lost");
+  const open=deals.filter(d=>d.status==="Open");
+  const openVal=open.reduce((a,d)=>a+d.amt,0);
+  const closed=[...won,...lost];
+  const avgWD=avg(won.map(d=>d.days));
+  // Open deals metrics
+  const cV=open.filter(d=>d.fc==='COMMIT').reduce((a,d)=>a+d.amt,0);
+  const mV=open.filter(d=>d.fc==='MOST LIKELY').reduce((a,d)=>a+d.amt,0);
+  const bV=open.filter(d=>d.fc==='BEST_CASE').reduce((a,d)=>a+d.amt,0);
+  document.getElementById('m-open').innerHTML=`
+    <div class="metric"><div class="lbl">Commit</div><div class="val">${fa(cV)}</div><div class="sub">${open.filter(d=>d.fc==='COMMIT').length} deals</div></div>
+    <div class="metric"><div class="lbl">Most Likely</div><div class="val">${fa(mV)}</div><div class="sub">${open.filter(d=>d.fc==='MOST LIKELY').length} deals</div></div>
+    <div class="metric"><div class="lbl">Best Case</div><div class="val">${fa(bV)}</div><div class="sub">${open.filter(d=>d.fc==='BEST_CASE').length} deals</div></div>
+    <div class="metric"><div class="lbl">Total open ARR</div><div class="val">${fa(openVal)}</div><div class="sub">${open.length} deals</div></div>
+  `;
+
+  // Open deals grouped (chronological: April → May → June)
+  const openSrt=sorted([...open].sort((a,b)=>new Date(a.closedate||'2099')-new Date(b.closedate||'2099')),'open');
+  const grp={};
+  openSrt.forEach(d=>{
+    const dt=d.closedate?new Date(d.closedate):null;
+    const qn=dt?dt.getFullYear()*10+Math.ceil((dt.getMonth()+1)/3):9999;
+    const ql=dt?`Q${Math.ceil((dt.getMonth()+1)/3)} ${dt.getFullYear()}`:'No close date';
+    const mn=dt?dt.getFullYear()*100+(dt.getMonth()+1):999999;
+    const ml=dt?`${MN[dt.getMonth()]} ${dt.getFullYear()}`:'No close date';
+    if(!grp[qn])grp[qn]={l:ql,m:{}};
+    if(!grp[qn].m[mn])grp[qn].m[mn]={l:ml,d:[]};
+    grp[qn].m[mn].d.push(d);
+  });
+
+  let html='';
+  Object.keys(grp).sort((a,b)=>+a-+b).forEach(qk=>{
+    const qg=grp[qk];
+    const qd=Object.values(qg.m).flatMap(m=>m.d);
+    const qv=qd.reduce((a,d)=>a+d.amt,0);
+    html+=`<tr class="qr"><td colspan="9">${qg.l} <span style="font-weight:400;font-size:11px;opacity:.75">${qd.length} deal${qd.length!==1?'s':''} &nbsp;·&nbsp; ${fa(qv)}</span></td></tr>`;
+    Object.keys(qg.m).sort((a,b)=>+a-+b).forEach(mk2=>{
+      const mg=qg.m[mk2];
+      const mv=mg.d.reduce((a,d)=>a+d.amt,0);
+      html+=`<tr class="mr"><td colspan="9" style="padding-left:18px">${mg.l} <span style="font-weight:400;opacity:.65">${mg.d.length} deal${mg.d.length!==1?'s':''} &nbsp;·&nbsp; ${fa(mv)}</span></td></tr>`;
+      mg.d.forEach(d=>{
+        const st=d.days>avgWD;
+        html+=`<tr>
+          <td style="padding-left:26px">${d.name}</td><td>${d.size}</td>
+          <td style="font-size:11px;color:var(--text2)">${SL[d.stage]||d.stage}</td>
+          <td><span class="badge ${FCC[d.fc]||'b-neutral'}">${FCL[d.fc]||'—'}</span></td>
+          <td>${fa(d.amt)}</td><td>${fa(d.mrr)}</td><td>${fd(d.closedate)}</td>
+          <td><span class="badge ${st?'b-warn':'b-neutral'}">${d.days}d</span></td>
+          <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${d.nextstep||'—'}</td>
+        </tr>`;
+      });
+    });
+  });
+  document.getElementById('open-rows').innerHTML=html;
+  
+  // 2026 Revenue
+  // 2026 Revenue: all deals closed in 2026 (won) + open deals with soft launch date
+  const revD=deals
+    .filter(d=>{
+      if(d.status==='Won'&&d.closedate&&d.closedate.startsWith('2026')) return true;
+      if(d.status==='Open') return true;
+      return false;
+    })
+    .map(d=>({...d,rev2026:calc2026(d)}));
+  const totRev=revD.reduce((a,d)=>a+d.rev2026,0);
+  const wonMRR=won.reduce((a,d)=>a+d.mrr,0);
+  document.getElementById('m-rev').innerHTML=`
+    <div class="metric"><div class="lbl">Won MRR</div><div class="val">${fa(wonMRR)}</div><div class="sub">${won.length} accounts</div></div>
+    <div class="metric"><div class="lbl">Projected 2026 Rev</div><div class="val">${fa(totRev)}</div><div class="sub">from soft launch dates</div></div>
+    <div class="metric"><div class="lbl">Deals w/ soft launch</div><div class="val">${revD.filter(d=>d.soft_launch).length}</div><div class="sub">of ${revD.length} total</div></div>
+    <div class="metric"><div class="lbl">Avg MRR per account</div><div class="val">${fa(won.length?Math.round(wonMRR/won.length):0)}</div><div class="sub">won deals</div></div>
+  `;
+  document.getElementById('rev-rows').innerHTML=sorted(revD,'rev').map(d=>`<tr>
+    <td>${d.name}</td>
+    <td><span class="badge ${FCC[d.fc]||'b-neutral'}">${FCL[d.fc]||'—'}</span></td>
+    <td>${fa(d.amt)}</td><td>${fa(d.mrr)}</td>
+    <td>${fd(d.soft_launch)}</td><td>${fd(d.golive)}</td>
+    <td style="font-weight:600;color:${d.rev2026>0?'var(--green-t)':'var(--text2)'}">${d.rev2026>0?fa(d.rev2026):'—'}</td>
+  </tr>`).join('');
+
+  // Implementation schedule
+  const implD=sorted(deals.filter(d=>d.status==='Won'||d.status==='Open').sort((a,b)=>new Date(a.soft_launch||'2099')-new Date(b.soft_launch||'2099')),'impl');
+  document.getElementById('impl-rows').innerHTML=implD.map(d=>`<tr>
+    <td>${d.name}</td>
+    <td>${fa(d.amt)}</td><td>${fa(d.mrr)}</td>
+    <td><span class="badge ${FCC[d.fc]||'b-neutral'}">${FCL[d.fc]||'—'}</span></td>
+    <td style="color:var(--text2)">${d.impl_amt||'—'}</td>
+    <td>${fd(d.closedate)}</td>
+    <td>${fd(d.soft_launch)}</td>
+    <td>${fd(d.golive)}</td>
+  </tr>`).join('');
+}
+
+function renderExpansion() {
+  const today = new Date().toISOString().slice(0,10);
+  const in90 = new Date(Date.now() + 90*864e5).toISOString().slice(0,10);
+  const all = allDeals.filter(d => d.dealtype === 'existingbusiness' || d.dealtype === 'Renewal');
+
+  const expAll = all.filter(d => d.dealtype === 'existingbusiness');
+  const renAll = all.filter(d => d.dealtype === 'Renewal');
+
+  const expWon = expAll.filter(d => d.status === 'Won');
+  const expOpen = expAll.filter(d => d.status === 'Open');
+  const renWon = renAll.filter(d => d.status === 'Won');
+  const renOpen = renAll.filter(d => d.status === 'Open');
+
+  const s = (arr, n, id, subId) => {
+    const arr2 = arr.reduce((a,d)=>a+d.amt,0);
+    document.getElementById(id).textContent = fa(arr2);
+    document.getElementById(subId).textContent = fa(arr2/12) + '/mo MRR · ' + arr.length + ' deal' + (arr.length!==1?'s':'');
+  };
+  s(expWon, expWon.length, 'exp-arr-w', 'exp-sub-w');
+  s(expOpen, expOpen.length, 'exp-arr-o', 'exp-sub-o');
+  s(renWon, renWon.length, 'ren-arr-w', 'ren-sub-w');
+  s(renOpen, renOpen.length, 'ren-arr-o', 'ren-sub-o');
+
+  // Upcoming (next 90 days)
+  const upcoming = all.filter(d => d.status === 'Open' && d.closedate && d.closedate >= today && d.closedate <= in90)
+    .sort((a,b) => a.closedate.localeCompare(b.closedate));
+  document.getElementById('exp-upcoming-rows').innerHTML = upcoming.length === 0
+    ? `<tr><td colspan="7" style="color:var(--text3);text-align:center;padding:16px">No upcoming renewals or expansions in the next 90 days</td></tr>`
+    : upcoming.map(d => `<tr>
+        <td>${d.name}</td>
+        <td><span class="badge b-nav">${d.dealtype === 'Renewal' ? 'Renewal' : 'Expansion'}</span></td>
+        <td>${fd(d.closedate)}</td>
+        <td>${fa(d.amt)}</td>
+        <td>${fa(d.mrr)}</td>
+        <td style="font-size:11px;color:var(--text2)">${SL[d.stage]||d.stage}</td>
+        <td><span class="badge ${FCC[d.fc]||'b-neutral'}">${FCL[d.fc]||'—'}</span></td>
+      </tr>`).join('');
+
+  // Won
+  const won = [...expWon, ...renWon].sort((a,b) => (b.closedate||'').localeCompare(a.closedate||''));
+  document.getElementById('exp-won-rows').innerHTML = won.length === 0
+    ? `<tr><td colspan="6" style="color:var(--text3);text-align:center;padding:16px">No won renewals or expansions yet</td></tr>`
+    : won.map(d => `<tr>
+        <td>${d.name}</td>
+        <td><span class="badge b-nav">${d.dealtype === 'Renewal' ? 'Renewal' : 'Expansion'}</span></td>
+        <td>${fd(d.closedate)}</td>
+        <td>${fa(d.amt)}</td>
+        <td>${fa(d.mrr)}</td>
+        <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.wonreason||'—'}</td>
+      </tr>`).join('');
+
+  // All open
+  const openAll = [...expOpen, ...renOpen].sort((a,b) => (a.closedate||'9999').localeCompare(b.closedate||'9999'));
+  document.getElementById('exp-open-rows').innerHTML = openAll.length === 0
+    ? `<tr><td colspan="7" style="color:var(--text3);text-align:center;padding:16px">No open renewals or expansions</td></tr>`
+    : openAll.map(d => `<tr>
+        <td>${d.name}</td>
+        <td><span class="badge b-nav">${d.dealtype === 'Renewal' ? 'Renewal' : 'Expansion'}</span></td>
+        <td>${fd(d.closedate)}</td>
+        <td>${fa(d.amt)}</td>
+        <td>${fa(d.mrr)}</td>
+        <td style="font-size:11px;color:var(--text2)">${SL[d.stage]||d.stage}</td>
+        <td><span class="badge ${FCC[d.fc]||'b-neutral'}">${FCL[d.fc]||'—'}</span></td>
+      </tr>`).join('');
+}
+
+function renderAll() {
+  renderWeekly();
+  renderOverview(sectionDeals.ov);
+  renderAnalysis(sectionDeals.an);
+  renderRevenue(sectionDeals.rv);
+  renderExpansion();
+}
+
+// Click on a chart bar to add to Deal Analysis filter
+function chartClickAddComp(competitor) {
+  if (!competitor) return;
+  const chips = document.getElementById('gf-comp-an');
+  if (!chips) return;
+  const chip = chips.querySelector(`.chip[data-val="${competitor}"]`);
+  if (chip && !chip.classList.contains('active')) {
+    chip.classList.add('active');
+    applyFilters('an');
+    // Scroll filter panel into view if closed
+    const panel = document.getElementById('filter-panel-an');
+    if (panel && panel.style.display === 'none') toggleFilters('an');
+  }
+}
+
+function chartClickAddOutcome(outcome) {
+  if (!outcome) return;
+  const chips = document.getElementById('gf-outcome-an');
+  if (!chips) return;
+  const chip = chips.querySelector(`.chip[data-val="${outcome}"]`);
+  if (chip && !chip.classList.contains('active')) {
+    chip.classList.add('active');
+    applyFilters('an');
+  }
+}
+
+// ── Win Rate Matrix ─────────────────────────────────────────
+function setDim(dim,el){curDim=dim;document.querySelectorAll('.dim-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');renderMatrix();}
+function renderMatrix(){
+  const cl=deals.filter(d=>d.status==='Won'||d.status==='Lost');
+  const cols=curDim==='size'?SZO:allSegs;
+  const aC=[...new Set(deals.flatMap(d=>d.compList))].filter(Boolean).sort();
+  const vC=cols.filter(c=>aC.some(comp=>cl.some(d=>d.compList.includes(comp)&&(curDim==='size'?d.size:d.seg)===c)));
+  const vComp=aC.filter(comp=>cl.some(d=>d.compList.includes(comp)));
+  document.getElementById('matrix-title').textContent=`Win rate by competitor × ${curDim}`;
+  const pill=(w,l)=>{if(!w&&!l)return`<span style="color:var(--text3);font-size:11px">—</span>`;const p=Math.round(w/(w+l)*100);return`<span class="pill ${p>=50?'pw':p===0?'pl':'pm'}">${w}–${l}<span class="pct">${p}%</span></span>`;};
+  const thead=`<thead><tr><th>Competitor</th>${vC.map(c=>`<th style="text-align:center;min-width:70px">${c}</th>`).join('')}<th style="text-align:center">All</th></tr></thead>`;
+  const tbody=vComp.map(comp=>{
+    const cells=vC.map(col=>{const p=cl.filter(d=>d.compList.includes(comp)&&(curDim==='size'?d.size:d.seg)===col);return`<td style="text-align:center">${pill(p.filter(d=>d.status==='Won').length,p.filter(d=>d.status==='Lost').length)}</td>`;}).join('');
+    const all=cl.filter(d=>d.compList.includes(comp));
+    return`<tr><td style="font-weight:500">${comp}</td>${cells}<td style="text-align:center">${pill(all.filter(d=>d.status==='Won').length,all.filter(d=>d.status==='Lost').length)}</td></tr>`;
+  }).join('');
+  document.getElementById('matrix-table').innerHTML=thead+`<tbody>${tbody}</tbody>`;
+  const od=aC.map(c=>{const p=cl.filter(d=>d.compList.includes(c));return{c,pct:p.length?Math.round(p.filter(d=>d.status==='Won').length/p.length*100):null,n:p.length};}).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+  document.getElementById('c-wrcomp-w').style.height=(od.length*36+60)+'px';
+  mk('c-wrcomp',{type:'bar',data:{labels:od.map(x=>x.c),datasets:[{data:od.map(x=>x.pct),backgroundColor:od.map(x=>x.pct>=50?'#4caf72':x.pct===0?'#e05252':'#e8a030'),borderRadius:3}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw}% · ${od[c.dataIndex].n} closed`}}},
+      scales:{x:{min:0,max:100,ticks:{callback:v=>v+'%',color:'#d0d0cc'},grid:{color:'rgba(255,255,255,0.06)'}},y:{grid:{display:false},ticks:{color:'#d0d0cc'}}}}});
+}
+
+loadData();
+</script>
+</body>
+</html>
