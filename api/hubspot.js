@@ -1,16 +1,16 @@
 export const maxDuration = 30;
- 
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
- 
+
   const TOKEN = process.env.HUBSPOT_TOKEN;
   if (!TOKEN) return res.status(500).json({ error: 'HUBSPOT_TOKEN not set' });
- 
+
   const headers = { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
- 
+
   const post = (url, body) => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 25000);
@@ -18,11 +18,11 @@ export default async function handler(req, res) {
       .then(r => { clearTimeout(t); return r.json(); })
       .catch(err => { clearTimeout(t); throw new Error('HubSpot request failed: ' + err.message); });
   };
- 
+
   if (req.query.endpoint !== 'deals' && req.query.endpoint !== 'emails') {
     return res.status(400).json({ error: 'Use ?endpoint=deals or ?endpoint=emails' });
   }
- 
+
   // ── EMAILS ENDPOINT — recent opened emails (last 7 days, top 10) ─────
   if (req.query.endpoint === 'emails') {
     try {
@@ -40,12 +40,16 @@ export default async function handler(req, res) {
         limit: 10
       };
       const resp = await post('https://api.hubapi.com/crm/v3/objects/emails/search', body);
+      // Surface HubSpot errors clearly instead of returning empty
+      if (resp.status === 'error' || resp.message) {
+        return res.status(500).json({ error: resp.message || 'HubSpot search failed', detail: resp });
+      }
       return res.status(200).json({ results: resp.results || [], total: resp.total || 0 });
     } catch (err) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Email fetch failed: ' + err.message });
     }
   }
- 
+
   try {
     // Fetch ALL deal types: newbusiness, existingbusiness (Expansion), Renewal
     // Uses 3 separate filterGroups joined with OR at the API level
@@ -57,7 +61,7 @@ export default async function handler(req, res) {
       ],
       limit: 200
     };
- 
+
     const props1 = [
       'dealname', 'dealstage', 'amount', 'createdate', 'closedate',
       'close_lost_reason', 'closed_lost_details', 'competitors', 'lost_to',
@@ -67,7 +71,7 @@ export default async function handler(req, res) {
     const props2 = [
       'implementation_amount', 'golive_date', 'soft_launch_date', 'next_step_date'
     ];
- 
+
     // Page through all results (HubSpot returns max 200 per page)
     let results = [];
     let after = null;
@@ -79,7 +83,7 @@ export default async function handler(req, res) {
       if (!resp.paging?.next?.after) break;
       after = resp.paging.next.after;
     }
- 
+
     // Batch-fetch extra props
     const ids = results.map(d => ({ id: String(d.id) }));
     let extraProps = [];
@@ -91,10 +95,10 @@ export default async function handler(req, res) {
       });
       if (batch.results) extraProps = extraProps.concat(batch.results);
     }
- 
+
     const extraMap = {};
     extraProps.forEach(d => { extraMap[d.id] = d.properties; });
- 
+
     results = results.map(d => ({
       ...d,
       properties: {
@@ -102,7 +106,7 @@ export default async function handler(req, res) {
         ...(extraMap[d.id] || {})
       }
     }));
- 
+
     return res.status(200).json({ results, total: results.length });
   } catch (err) {
     return res.status(500).json({ error: err.message });
