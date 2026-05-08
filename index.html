@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#141414;--bg2:#1e1e1e;--bg3:#0d0d0d;--bg4:#282828;
+  --text:#f0f0ee;--text2:#a0a09c;--text3:#606060;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.16);
+  --accent:#7c6af7;--accent-h:#8f7ff9;--accent-bg:rgba(124,106,247,0.15);--accent-t:#b8aeff;
+  --green:#4caf72;--green-bg:rgba(76,175,114,0.15);--green-t:#7dd9a0;
+  --red:#e05252;--red-bg:rgba(224,82,82,0.15);--red-t:#f09595;
+  --blue:#5b9ef7;--blue-bg:rgba(91,158,247,0.15);--blue-t:#85B7EB;
+  --amber:#e8a030;--amber-bg:rgba(232,160,48,0.15);--amber-t:#f5bf6a;
+  --r:8px;--rl:10px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);font-size:13px;line-height:1.5}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 20px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px}
+.hdr-l{display:flex;align-items:center;gap:12px}
+.logo{height:28px;filter:brightness(0) invert(1)}
+.hdiv{width:1px;height:22px;background:rgba(255,255,255,0.15)}
+.htitle{font-size:15px;font-weight:600}
+.hsub{font-size:11px;color:var(--text3);margin-top:1px}
+.btn-r{padding:6px 14px;font-size:12px;border:none;border-radius:var(--r);background:var(--accent);color:#fff;cursor:pointer;font-weight:500}
+.btn-r:hover{background:var(--accent-h)}
+.btn-r:disabled{opacity:.5;cursor:not-allowed}
+#loading{text-align:center;padding:80px 20px;color:var(--text2)}
+.spinner{width:32px;height:32px;border:3px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#err{background:var(--red-bg);color:var(--red-t);border:1px solid var(--red);padding:14px;border-radius:var(--rl);margin:12px 20px;display:none}
+.sec-nav{display:flex;gap:0;border-bottom:1px solid var(--border2);padding:0 20px;background:var(--bg2)}
+.sec-tab{padding:10px 18px;font-size:13px;cursor:pointer;border:none;background:transparent;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500;white-space:nowrap}
+.sec-tab:hover{color:var(--text)}
+.sec-tab.active{color:var(--accent-t);border-bottom-color:var(--accent);font-weight:600}
+.sub-nav{display:flex;gap:2px;padding:10px 20px 0;background:var(--bg2);border-bottom:1px solid var(--border)}
+.sub-tab{padding:5px 13px;font-size:12px;cursor:pointer;border:none;border-radius:6px 6px 0 0;background:transparent;color:var(--text2);white-space:nowrap;margin-bottom:-1px;border:1px solid transparent;border-bottom:none}
+.sub-tab:hover{background:var(--bg4);color:var(--text)}
+.sub-tab.active{background:var(--bg3);color:var(--text);border-color:var(--border);font-weight:500}
+#dashboard{padding:14px 20px}
+.gf{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:14px}
+.gfl{font-size:11px;color:var(--text2);white-space:nowrap;font-weight:500}
+select{font-size:12px;padding:4px 8px;border:1px solid var(--border2);border-radius:6px;background:var(--bg4);color:var(--text);cursor:pointer}
+select:hover,select:focus{outline:none;border-color:var(--accent)}
+select.filter-active{border-color:var(--accent);background:var(--accent-bg);color:var(--accent-t);font-weight:500}
+.filter-bar{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.filter-toggle{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;background:var(--accent);border:1px solid var(--accent);border-radius:var(--r);color:#fff;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;line-height:1;box-sizing:border-box}
+.fc-quarter-select{display:inline-flex;align-items:center;height:34px;padding:0 36px 0 14px;background:var(--accent);border:1px solid var(--accent);border-radius:var(--r);color:#fff;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;line-height:1;box-sizing:border-box;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");background-repeat:no-repeat;background-position:right 12px center;background-size:10px}
+.fc-quarter-select:hover{background-color:#6a58e0;border-color:#6a58e0}
+.fc-quarter-select option{background:var(--bg2);color:var(--text)}
+.filter-toggle:hover{background:var(--accent-h);border-color:var(--accent-h)}
+.filter-toggle.open{background:var(--accent-h);border-color:var(--accent-h)}
+.filter-caret{font-size:11px;opacity:.7;transition:transform .2s}
+.filter-caret.open{transform:rotate(180deg)}
+.filter-summary{font-size:13px;color:var(--text);font-weight:500;display:inline-flex;align-items:center;height:34px}
+.filter-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px 16px;margin-bottom:14px}
+.filter-row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+.filter-cell{display:flex;flex-direction:column;gap:5px}
+.filter-cell label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.filter-reset{padding:5px 12px;font-size:11px;border:1px solid var(--border2);border-radius:6px;background:transparent;color:var(--text2);cursor:pointer;margin-left:auto;align-self:flex-end}
+.filter-reset:hover{border-color:var(--red);color:var(--red-t)}
+.filter-reset-prominent{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:14px;color:var(--text);font-size:11px;font-weight:600;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;transition:all .15s;line-height:1}
+.filter-reset-prominent:hover{background:rgba(224,82,82,.12);border-color:#e05252;color:#f1a3a3}
+.ms-wrap{position:relative;display:inline-block;min-width:160px}
+.ms-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 10px;border:1px solid var(--border2);border-radius:6px;background:var(--bg4);color:var(--text);cursor:pointer;font-size:12px;text-align:left}
+.ms-btn:hover,.ms-btn.open{border-color:var(--accent)}
+.ms-btn.open{background:var(--accent-bg);color:var(--accent-t)}
+.ms-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.ms-caret{font-size:10px;opacity:.7;flex-shrink:0}
+.ms-menu{position:absolute;top:calc(100% + 4px);left:0;min-width:200px;max-height:260px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:6px 0;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:50;display:none}
+.ms-menu.open{display:block}
+.ms-opt{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:12px;color:var(--text);cursor:pointer;user-select:none}
+.ms-opt:hover{background:var(--bg3)}
+.ms-opt input{cursor:pointer;margin:0}
+.week-pill{position:relative;display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;overflow:hidden;transition:all .2s;line-height:1;box-sizing:border-box}
+.week-pill:hover,.week-pill.open{border-color:var(--accent);color:var(--accent-t);background:var(--accent-bg)}
+.week-pill:hover::after{content:"";position:absolute;top:0;left:-75%;width:50%;height:100%;background:linear-gradient(90deg,transparent 0%,rgba(124,106,247,.25) 50%,transparent 100%);animation:shimmer 2.2s ease-in-out infinite;pointer-events:none}
+@keyframes shimmer{0%{left:-75%}60%,100%{left:125%}}
+.week-caret{font-size:11px;opacity:.7;transition:transform .2s}
+.week-caret.open{transform:rotate(180deg)}
+.week-range{color:var(--text3);font-size:11px;font-weight:400;margin-left:4px}
+.week-body{display:none;margin-top:10px;margin-bottom:14px;padding:14px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)}
+.week-body.open{display:block}
+.week-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:4px}
+.week-bucket{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:10px 12px}
+.week-bucket-title{font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.week-bucket-count{background:var(--bg4);color:var(--text);padding:1px 7px;border-radius:10px;font-size:10px}
+.week-bucket ul{list-style:none;padding:0;margin:0;max-height:200px;overflow-y:auto}
+.week-bucket li{font-size:12px;color:var(--text);padding:3px 0;display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border);line-height:1.3}
+.week-bucket li:last-child{border-bottom:none}
+.week-bucket li .wb-sub{color:var(--text3);font-size:11px;white-space:nowrap;flex-shrink:0}
+.week-bucket-empty{color:var(--text3);font-size:11px;font-style:italic;padding:4px 0}
+.week-sum-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0 6px 0;margin-bottom:4px;border-bottom:1px solid var(--border2);font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+.week-sum-row span{color:var(--text);font-weight:700;text-transform:none;letter-spacing:0;font-size:12px}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.g-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+@media(max-width:980px){.g3{grid-template-columns:1fr}}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+@media(max-width:900px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.g4,.g2{grid-template-columns:1fr}}
+.metric{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;transition:border-color .15s,transform .15s,box-shadow .15s}
+.metric.clickable{cursor:pointer;transition:all .15s;border:1px solid var(--border)}
+.metric.clickable:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 4px 12px rgba(124,106,247,.15)}
+.metric.drill-active{border-color:var(--accent);background:var(--accent-bg);box-shadow:0 0 0 1px var(--accent)}
+.drill-close{background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 8px;border-radius:4px;transition:all .15s}
+.drill-close:hover{color:var(--text);background:var(--bg3)}
+.matrix-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px}
+.matrix-modal-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);max-width:1100px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.6)}
+.matrix-modal-header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.04em}
+.matrix-modal-body{padding:14px 18px;overflow-y:auto;flex:1}
+.matrix-modal-body table{width:100%;font-size:12px}
+
+/* ── Target Tracking ── */
+.tt-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;padding:0 16px}
+.tt-quota-editable{cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .15s}
+.tt-quota-editable:hover{border-bottom-color:var(--accent)}
+.tt-cnc-edit{cursor:pointer;border-bottom:1px dashed var(--text3);color:#a0a0a0;transition:border-color .15s,color .15s}
+.tt-cnc-edit:hover{border-bottom-color:var(--accent);color:var(--accent-t)}
+.tt-stat{padding:8px 0}
+.tt-stat-lbl{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.tt-stat-val{font-size:22px;font-weight:700;color:var(--text);line-height:1.1}
+.tt-stat-sub{font-size:11px;color:var(--text2);margin-top:3px}
+.tt-progress-wrap{margin:14px 16px 4px 16px}
+.tt-progress-bar{position:relative;height:18px;background:var(--bg3);border-radius:4px;overflow:hidden;display:flex}
+.tt-progress-bar.compact{height:10px}
+.tt-seg-closed{background:#4caf72;height:100%}
+.tt-seg-forecast{background:#5b9ef7;height:100%;opacity:.85}
+.tt-seg-best{background:#e8a030;height:100%;opacity:.55}
+.tt-seg-cnc{background:#888;height:100%;opacity:.5;background-image:repeating-linear-gradient(45deg,transparent 0,transparent 4px,rgba(255,255,255,.1) 4px,rgba(255,255,255,.1) 8px)}
+.tt-progress-meta{display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:5px;text-transform:uppercase;letter-spacing:.04em}
+.tt-q-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;transition:border-color .15s,transform .15s,box-shadow .15s}
+.tt-q-card.tt-active{border-color:var(--accent);background:var(--accent-bg);box-shadow:0 0 0 1px var(--accent)}
+.tt-q-card.q-current{border-color:var(--border)}
+.tt-q-title{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.tt-q-name{font-size:13px;font-weight:700;color:var(--text)}
+.tt-q-pct{font-size:18px;font-weight:700;color:var(--text)}
+.tt-q-pct.over{color:#7dd9a5}
+.tt-q-row{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;color:var(--text2)}
+.tt-q-row .v{color:var(--text);font-weight:500}
+.tt-q-row.gap .v.negative{color:#7dd9a5}
+.tt-q-divider{border-top:1px solid var(--border);margin:7px 0}
+/* Simple rows for H1/H2/Monthly */
+.tt-simple-row{display:grid;grid-template-columns:36px 1fr 72px 36px 72px 64px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)}
+.tt-simple-row:last-child{border-bottom:none}
+.tt-simple-header{display:grid;grid-template-columns:36px 1fr 72px 36px 72px 64px;gap:6px;align-items:center;padding:2px 0 4px;border-bottom:1px solid var(--border2);margin-bottom:2px}
+.tt-simple-row.tt-current-row{background:rgba(124,106,247,.05);border-radius:4px}
+.tt-sr-label{font-size:11px;font-weight:600;color:var(--text2)}
+.tt-sr-bar{min-width:0}
+.tt-sr-closed,.tt-sr-pct,.tt-sr-quota,.tt-sr-gap{font-size:11px;text-align:right;white-space:nowrap}
+.tt-sr-closed{color:var(--text);font-weight:500}
+.tt-sr-quota{color:var(--text3)}
+.tt-cur-badge{font-size:9px;background:var(--accent-bg);color:var(--accent-t);border-radius:3px;padding:1px 5px;margin-left:5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+
+#matrix-table td:not(:first-child){cursor:pointer;transition:background .15s}
+#matrix-table td:not(:first-child):hover{background:var(--accent-bg)}
+.deal-link{color:inherit;text-decoration:none;border-bottom:1px solid transparent;transition:border-color .15s,color .15s}
+.deal-link:hover{color:var(--accent-t);border-bottom-color:var(--accent)}
+.collapsible-ct{display:flex;justify-content:flex-start;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.collapsible-ct:hover{color:var(--accent-t)}
+.collapse-caret{font-size:16px;font-weight:700;opacity:.85;color:var(--accent-t);transition:transform .2s;display:inline-block;line-height:1}
+.collapse-caret.open{transform:rotate(180deg)}
+.collapsible-body.open{display:block!important}
+.sum-row td{background:var(--bg3);border-top:1px solid var(--border2);border-bottom:1px solid var(--border2);padding:8px 10px;font-size:12px}
+.fc-row-won    td{background:rgba(76,175,114,.12);border-bottom:1px solid rgba(76,175,114,.2)}
+.fc-row-mostly td{background:rgba(91,158,247,.10);border-bottom:1px solid rgba(91,158,247,.2)}
+.fc-row-best   td{background:rgba(232,160,48,.10);border-bottom:1px solid rgba(232,160,48,.2)}
+.fc-row-lost   td{background:rgba(224,82,82,.10);border-bottom:1px solid rgba(224,82,82,.2)}
+.fc-badge-closed-won  {background:rgba(76,175,114,.18);color:#7dd9a5}
+.fc-badge-commit      {background:rgba(76,175,114,.14);color:#7dd9a5}
+.fc-badge-most-likely {background:rgba(91,158,247,.18);color:#9bc4ff}
+.fc-badge-best-case   {background:rgba(232,160,48,.18);color:#f5c87a}
+.fc-badge-pipeline    {background:rgba(124,106,247,.18);color:#b5a8ff}
+.fc-badge-closed-lost {background:rgba(224,82,82,.18);color:#f1a3a3}
+.g3 .card table,.g4 .card table{font-size:11.5px}
+.g3 .card td,.g3 .card th,.g4 .card td,.g4 .card th{padding:5px 6px}
+.g3 .card .fc-cat-name,.g4 .card .fc-cat-name{font-size:10.5px;margin-right:5px}
+.g3 .card .fc-cat-meta,.g4 .card .fc-cat-meta{font-size:10px}
+.g3 .card .fc-cat-total,.g4 .card .fc-cat-total{font-size:11.5px}
+.g3 .card .badge,.g4 .card .badge{font-size:9px;padding:1px 5px}
+.g3 .card .ct,.g4 .card .ct{padding:8px 12px}
+.fc-cat-header td{padding:9px 10px !important;border-top:1px solid var(--border2);border-right:1px solid var(--border2);background:var(--bg3)}
+.fc-cat-header td:first-child{border-left:none}
+.fc-cat-name{font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.04em;margin-right:8px}
+.fc-cat-meta{font-size:11px;color:var(--text3)}
+.fc-cat-total{font-size:13px;font-weight:700;color:var(--text)}
+.fc-cat-closed-won  td{background:rgba(76,175,114,.10) !important}
+.fc-cat-commit      td{background:rgba(76,175,114,.08) !important}
+.fc-cat-most-likely td{background:rgba(91,158,247,.10) !important}
+.fc-cat-best-case   td{background:rgba(232,160,48,.10) !important}
+.fc-cat-pipeline    td{background:rgba(124,106,247,.10) !important}
+.fc-cat-closed-lost td{background:rgba(224,82,82,.10) !important}
+.fc-deal-row td:last-child{border-right:1px solid var(--border2)}
+.fc-deal-row-last td{border-bottom:1px solid var(--border2)}
+.metric .lbl{font-size:10px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;font-weight:500}
+.metric .val{font-size:24px;font-weight:700;color:var(--text);letter-spacing:-.5px}
+.metric .sub{font-size:12px;color:var(--text2);margin-top:3px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;margin-bottom:14px}
+.ct{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+.leg{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;font-size:11px;color:var(--text2)}
+.leg span{display:flex;align-items:center;gap:5px}
+.dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+table{width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed}
+th{font-weight:600;color:var(--text2);padding:8px 10px;border-bottom:1px solid var(--border2);font-size:10px;text-align:left;white-space:nowrap;cursor:pointer;user-select:none;text-transform:uppercase;letter-spacing:.05em;background:var(--bg3)}
+th:hover{color:var(--accent-t)}
+th .si{margin-left:3px;opacity:.4}
+th.sa .si,th.sd .si{opacity:1;color:var(--accent)}
+td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(124,106,247,.05)}
+.qr td{background:rgba(124,106,247,.14)!important;font-size:12px;font-weight:700;color:var(--accent-t);padding:9px 10px;border-top:1px solid var(--border);border-bottom:1px solid rgba(124,106,247,.3);letter-spacing:.04em;text-transform:uppercase}
+.mr td{background:var(--bg3)!important;font-size:10px;font-weight:600;color:#d0d0cc;padding:5px 10px 5px 20px;border-bottom:1px solid var(--border);letter-spacing:.03em;text-transform:uppercase}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
+.b-won{background:var(--green-bg);color:var(--green-t)}
+.b-lost{background:var(--red-bg);color:var(--red-t)}
+.b-open{background:var(--blue-bg);color:var(--blue-t)}
+.b-warn{background:var(--amber-bg);color:var(--amber-t)}
+.b-neutral{background:rgba(255,255,255,.06);color:var(--text2)}
+.fc-commit{background:var(--green-bg);color:var(--green-t)}
+.fc-most{background:var(--blue-bg);color:var(--blue-t)}
+.fc-best{background:var(--amber-bg);color:var(--amber-t)}
+.fc-pipeline{background:rgba(255,255,255,.06);color:var(--text2)}
+.pill{display:inline-flex;flex-direction:column;align-items:center;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:500;min-width:46px;line-height:1.3}
+.pill .pct{font-size:10px;font-weight:400;opacity:.85}
+.pw{background:var(--green-bg);color:var(--green-t)}
+.pl{background:var(--red-bg);color:var(--red-t)}
+.pm{background:var(--amber-bg);color:var(--amber-t)}
+.dim-toggle{display:flex;gap:4px;background:var(--bg3);border-radius:var(--r);padding:3px;border:1px solid var(--border)}
+.dim-btn{padding:4px 12px;font-size:11px;cursor:pointer;border:none;border-radius:5px;background:transparent;color:var(--text2)}
+.dim-btn.active{background:var(--accent);color:#fff;font-weight:500}
+.chart-wrap{position:relative;width:100%}
+.sec{display:none}.sec.active{display:block}
+.view{display:none}.view.active{display:block}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="hdr">
+    <div class="hdr-l">
+      <img src="https://www.jewelersuite.com/hubfs/JewelerSuite%20Logo%20-%20White.png" class="logo" alt="JewelerSuite" onerror="this.style.display='none'">
+      <div class="hdiv"></div>
+      <div><div class="htitle">Pipeline Dashboard</div><div class="hsub" id="last-updated">Loading...</div></div>
+    </div>
+    <button class="btn-r" id="btn-r" onclick="loadData()">↻ Refresh</button>
+  </div>
+  <div id="err"></div>
+  <div id="loading" style="padding:80px 20px">
+    <div class="spinner"></div>
+    <div id="lmsg">Connecting to HubSpot...</div>
+    <div style="margin-top:6px;font-size:12px;color:var(--text3)">This takes 5–10 seconds</div>
+  </div>
+  <div id="dashboard" style="display:none">
+    <div class="sec-nav" id="sec-nav">
+      <button class="sec-tab active" onclick="showSec('overview',this)">Overview</button>
+      <button class="sec-tab" onclick="showSec('forecast',this)">Pipeline Review</button>
+      <button class="sec-tab" onclick="showSec('target',this)">Quota Tracking</button>
+      <button class="sec-tab" onclick="showSec('analysis',this)">Win/Loss Analysis</button>
+      <button class="sec-tab" onclick="showSec('expansion',this)">Renewals & Expansion</button>
+      <button class="sec-tab" onclick="showSec('revenue',this)">Revenue & Implementation</button>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div id="sec-overview" class="sec active">
+      <div style="padding:14px 20px">
+        <div class="filter-bar">
+          <button class="week-pill" id="week-toggle-btn" onclick="toggleWeekly(event)">
+            <span class="week-caret" id="week-caret">▾</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>Weekly Snapshot</span>
+            <span class="week-range" id="week-range"></span>
+          </button>
+          <button class="filter-toggle" id="filter-toggle-btn-ov" onclick="toggleFilters('ov')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+            Filters <span class="filter-caret" id="filter-caret-ov">▾</span>
+          </button>
+          <span class="filter-summary" id="filter-summary-ov">Closing: Q2 2026</span>
+        </div>
+        <div class="week-body" id="week-body"></div>
+        <div class="filter-panel" id="filter-panel-ov" style="display:none">
+          <div class="filter-row">
+            <div class="filter-cell"><label class="gfl">Created in</label>
+              <select id="gf-created-ov" onchange="applyFilters('ov')"><option value="all">All time</option><option value="fy26">FY26</option><option value="q2-26">Q2 2026</option><option value="q1-26">Q1 2026</option><option value="q4-25">Q4 2025</option><option value="2026-04">Apr 2026</option><option value="2026-03">Mar 2026</option><option value="2026-02">Feb 2026</option><option value="2026-01">Jan 2026</option><option value="2025-12">Dec 2025</option><option value="2025-11">Nov 2025</option><option value="2025-10">Oct 2025</option></select>
+            </div>
+            <div class="filter-cell"><label class="gfl">Closing in</label>
+              <select id="gf-closing-ov" onchange="applyFilters('ov')"><option value="all">All time</option><option value="fy26">FY26</option><option value="q2-26" selected>Q2 2026</option><option value="q3-26">Q3 2026</option><option value="q1-26">Q1 2026</option><option value="q4-25">Q4 2025</option><option value="2026-09">Sep 2026</option><option value="2026-08">Aug 2026</option><option value="2026-07">Jul 2026</option><option value="2026-06">Jun 2026</option><option value="2026-05">May 2026</option><option value="2026-04">Apr 2026</option><option value="2026-03">Mar 2026</option><option value="2026-02">Feb 2026</option><option value="2026-01">Jan 2026</option></select>
+            </div>
+            <div class="filter-cell"><label class="gfl">Size</label><select id="gf-sz-ov" onchange="applyFilters('ov')"><option value="">All</option><option>SMB</option><option>Medium+</option><option>Mid-Market</option><option>Enterprise</option></select></div>
+            <div class="filter-cell"><label class="gfl">Segmentation</label><select id="gf-sg-ov" onchange="applyFilters('ov')"><option value="">All</option></select></div>
+            <div class="filter-cell"><label class="gfl">Owner / BDR</label>
+              <select id="gf-owner-ov" onchange="applyFilters('ov')"><option value="">All owners</option><option value="81638455">Levi O'Brien</option><option value="77422527">Michael Razny</option><option value="77425580">Emily Lawless</option><option value="78064629">Hannah Heintze</option><option value="78930942">Brady Jensen</option><option value="82442702">Dhru-Vina Patel</option><option value="84615860">Kei Wakabayashi</option><option value="84615861">Hemalatha Palani</option></select>
+            </div>
+            <button class="filter-reset" onclick="resetFilters('ov')">Reset</button>
+          </div>
+        </div>
+        <div class="g-metrics" id="m-top"></div>
+        <div id="m-drill" style="display:none;margin-bottom:14px"></div>
+        <div class="card collapsible-card" id="card-emails" style="margin-bottom:14px">
+          <div class="ct collapsible-ct" onclick="toggleCard('card-emails')"><span class="collapse-caret">▾</span><span>Recently opened emails</span><span style="font-size:10px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px">(last 7 days · top 10)</span></div>
+          <div class="collapsible-body" style="display:none"><div id="emails-body" style="font-size:12px;color:var(--text3)">Loading...</div></div>
+        </div>
+        <div class="card" id="card-open-deals">
+          <div class="ct collapsible-ct" onclick="toggleCard('card-open-deals')"><span class="collapse-caret open">▾</span><span>Open deals</span><span id="ov-open-lbl" style="font-size:10px;color:var(--accent-t);font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px"></span></div>
+          <div class="collapsible-body" style="display:block">
+            <div style="overflow-x:auto"><table><thead><tr>
+              <th style="width:19%" onclick="srt('ov-open','name',this)">Account <span class="si">↕</span></th>
+              <th style="width:8%" onclick="srt('ov-open','closedate',this)">Close date <span class="si">↕</span></th>
+              <th style="width:7%" onclick="srt('ov-open','amt',this)">ARR <span class="si">↕</span></th>
+              <th style="width:6%" onclick="srt('ov-open','mrr',this)">MRR <span class="si">↕</span></th>
+              <th style="width:8%">Impl. $</th>
+              <th style="width:13%" onclick="srt('ov-open','stage',this)">Stage <span class="si">↕</span></th>
+              <th style="width:9%" onclick="srt('ov-open','fc',this)">Forecast <span class="si">↕</span></th>
+              <th style="width:8%" onclick="srt('ov-open','golive',this)">Go-live <span class="si">↕</span></th>
+              <th style="width:8%" onclick="srt('ov-open','soft_launch',this)">Soft launch <span class="si">↕</span></th>
+              <th style="width:10%" onclick="srt('ov-open','nextstepdate',this)">Next step date <span class="si">↕</span></th>
+            </tr><tr id="ov-open-sum" class="sum-row"></tr></thead><tbody id="ov-open-rows"></tbody></table></div>
+          </div>
+        </div>
+        <div class="card" id="card-won-deals">
+          <div class="ct collapsible-ct" onclick="toggleCard('card-won-deals')"><span class="collapse-caret open">▾</span><span>Won deals</span></div>
+          <div class="collapsible-body" style="display:block">
+            <div style="overflow-x:auto"><table><thead><tr>
+              <th style="width:20%" onclick="srt('ov-won','name',this)">Account <span class="si">↕</span></th>
+              <th style="width:9%">Type</th><th style="width:7%" onclick="srt('ov-won','size',this)">Size <span class="si">↕</span></th>
+              <th style="width:13%" onclick="srt('ov-won','seg',this)">Segmentation <span class="si">↕</span></th>
+              <th style="width:14%">Competitors</th><th style="width:13%">Won reason</th>
+              <th style="width:8%" onclick="srt('ov-won','amt',this)">ARR <span class="si">↕</span></th>
+              <th style="width:6%" onclick="srt('ov-won','mrr',this)">MRR <span class="si">↕</span></th>
+              <th style="width:10%" onclick="srt('ov-won','closedate',this)">Close date <span class="si">↕</span></th>
+            </tr></thead><tbody id="ov-won-rows"></tbody></table></div>
+          </div>
+        </div>
+        <div class="card" id="card-lost-deals">
+          <div class="ct collapsible-ct" onclick="toggleCard('card-lost-deals')"><span class="collapse-caret open">▾</span><span>Lost deals</span></div>
+          <div class="collapsible-body" style="display:block">
+            <div style="overflow-x:auto"><table><thead><tr>
+              <th style="width:20%" onclick="srt('ov-lost','name',this)">Account <span class="si">↕</span></th>
+              <th style="width:8%" onclick="srt('ov-lost','size',this)">Size <span class="si">↕</span></th>
+              <th style="width:13%" onclick="srt('ov-lost','seg',this)">Segmentation <span class="si">↕</span></th>
+              <th style="width:12%">Lost to</th><th style="width:14%">Loss reason</th>
+              <th style="width:8%" onclick="srt('ov-lost','amt',this)">ARR <span class="si">↕</span></th>
+              <th style="width:6%" onclick="srt('ov-lost','mrr',this)">MRR <span class="si">↕</span></th>
+              <th style="width:10%" onclick="srt('ov-lost','closedate',this)">Close date <span class="si">↕</span></th>
+            </tr></thead><tbody id="ov-lost-rows"></tbody></table></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIPELINE REVIEW -->
+    <div id="sec-forecast" class="sec">
+      <div style="padding:14px 20px">
+        <div class="filter-bar">
+          <label class="gfl" style="margin:0 8px 0 0;color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.05em">Quarter</label>
+          <select id="fc-quarter" onchange="renderForecast()" class="fc-quarter-select"><option value="2026-FY">FY 2026 (full year)</option><option value="2026-Q1">Q1 2026</option><option value="2026-Q2" selected>Q2 2026</option><option value="2026-Q3">Q3 2026</option><option value="2026-Q4">Q4 2026</option><option value="2027-Q1">Q1 2027</option><option value="2027-Q2">Q2 2027</option></select>
+          <span style="font-size:11px;color:var(--text3);margin-left:14px">New business + expansion · grouped by close date</span>
+        </div>
+        <div class="g4" id="fc-metrics" style="margin-bottom:14px"></div>
+        <div id="fc-drill" style="display:none;margin-bottom:14px"></div>
+        <div id="fc-quarter-tile" class="card" style="margin-bottom:14px"></div>
+        <div class="g3" id="fc-months-grid"></div>
+      </div>
+    </div>
+
+    <!-- QUOTA TRACKING -->
+    <div id="sec-target" class="sec">
+      <div style="padding:14px 20px">
+        <div class="filter-bar"><span style="font-size:11px;color:var(--text3);margin-left:2px">Quota tracking · New business + expansion (renewals excluded) · 2026</span></div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="ct">FY 2026 — Annual Quota</div>
+          <div id="tt-annual" style="padding:8px 0"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px" id="tt-quarters"></div>
+        <div id="tt-drill" style="display:none;margin-top:14px"></div>
+      </div>
+    </div>
+
+    <!-- WIN/LOSS ANALYSIS -->
+    <div id="sec-analysis" class="sec">
+      <div class="sub-nav" id="analysis-subnav">
+        <button class="sub-tab active" onclick="showView('v-winrate','analysis-subnav',this)">Win Rate Matrix</button>
+        <button class="sub-tab" onclick="showView('v-losses','analysis-subnav',this)">Win/Loss Analysis</button>
+        <button class="sub-tab" onclick="showView('v-competitors','analysis-subnav',this)">Competitors</button>
+        <button class="sub-tab" onclick="showView('v-pos','analysis-subnav',this)">Current POS</button>
+        <button class="sub-tab" onclick="showView('v-velocity','analysis-subnav',this)">Velocity</button>
+        <button class="sub-tab" onclick="showView('v-alldeals','analysis-subnav',this)">All Deals</button>
+      </div>
+      <div style="padding:14px 20px">
+        <div class="filter-bar">
+          <button class="filter-toggle" id="filter-toggle-btn-an" onclick="toggleFilters('an')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg> Filters <span class="filter-caret" id="filter-caret-an">▾</span></button>
+          <span class="filter-summary" id="filter-summary-an">No filters applied</span>
+          <button class="filter-reset-prominent" onclick="resetFilters('an')">Reset filters</button>
+        </div>
+        <div class="filter-panel" id="filter-panel-an" style="display:none">
+          <div class="filter-row">
+            <div class="filter-cell"><label class="gfl">Created in</label><select id="gf-created-an" onchange="applyFilters('an')"><option value="all">All time</option><option value="fy26">FY26</option><option value="q2-26">Q2 2026</option><option value="q1-26">Q1 2026</option><option value="q4-25">Q4 2025</option><option value="2026-04">Apr 2026</option><option value="2026-03">Mar 2026</option><option value="2026-02">Feb 2026</option><option value="2026-01">Jan 2026</option><option value="2025-12">Dec 2025</option><option value="2025-11">Nov 2025</option><option value="2025-10">Oct 2025</option></select></div>
+            <div class="filter-cell"><label class="gfl">Closing in</label><select id="gf-closing-an" onchange="applyFilters('an')"><option value="all">All time</option><option value="fy26">FY26</option><option value="q2-26" selected>Q2 2026</option><option value="q3-26">Q3 2026</option><option value="q1-26">Q1 2026</option><option value="q4-25">Q4 2025</option><option value="2026-09">Sep 2026</option><option value="2026-08">Aug 2026</option><option value="2026-07">Jul 2026</option><option value="2026-06">Jun 2026</option><option value="2026-05">May 2026</option><option value="2026-04">Apr 2026</option><option value="2026-03">Mar 2026</option><option value="2026-02">Feb 2026</option><option value="2026-01">Jan 2026</option></select></div>
+            <div class="filter-cell"><label class="gfl">Size</label><select id="gf-sz-an" onchange="applyFilters('an')"><option value="">All</option><option>SMB</option><option>Medium+</option><option>Mid-Market</option><option>Enterprise</option></select></div>
+            <div class="filter-cell"><label class="gfl">Segmentation</label><select id="gf-sg-an" onchange="applyFilters('an')"><option value="">All</option></select></div>
+            <div class="filter-cell"><label class="gfl">Owner / BDR</label><select id="gf-owner-an" onchange="applyFilters('an')"><option value="">All owners</option><option value="81638455">Levi O'Brien</option><option value="77422527">Michael Razny</option><option value="77425580">Emily Lawless</option><option value="78064629">Hannah Heintze</option><option value="78930942">Brady Jensen</option><option value="82442702">Dhru-Vina Patel</option><option value="84615860">Kei Wakabayashi</option><option value="84615861">Hemalatha Palani</option></select></div>
+            <div class="filter-cell"><label class="gfl">Competitor</label><div class="ms-wrap" id="gf-comp-an-wrap"><button class="ms-btn" type="button" onclick="toggleMs(event,'gf-comp-an')"><span class="ms-label" id="gf-comp-an-label">All competitors</span><span class="ms-caret">▾</span></button><div class="ms-menu" id="gf-comp-an"></div></div></div>
+            <div class="filter-cell"><label class="gfl">Outcome</label><div class="ms-wrap" id="gf-outcome-an-wrap"><button class="ms-btn" type="button" onclick="toggleMs(event,'gf-outcome-an')"><span class="ms-label" id="gf-outcome-an-label">All outcomes</span><span class="ms-caret">▾</span></button><div class="ms-menu" id="gf-outcome-an"><label class="ms-opt"><input type="checkbox" value="Won" onchange="msChanged('gf-outcome-an','an','outcomes')"> Won</label><label class="ms-opt"><input type="checkbox" value="Lost" onchange="msChanged('gf-outcome-an','an','outcomes')"> Lost</label><label class="ms-opt"><input type="checkbox" value="Open" onchange="msChanged('gf-outcome-an','an','outcomes')"> Open</label></div></div></div>
+            <button class="filter-reset" onclick="resetFilters('an')">Reset</button>
+          </div>
+        </div>
+        <div id="v-losses" class="view">
+          <div class="g2"><div class="card"><div class="ct">Loss reasons</div><div class="chart-wrap" style="height:220px"><canvas id="c-loss"></canvas></div></div><div class="card"><div class="ct">Won reasons</div><div class="chart-wrap" style="height:220px"><canvas id="c-wonreason"></canvas></div></div></div>
+          <div class="g2"><div class="card"><div class="ct">Lost to (specific competitor)</div><div class="chart-wrap" id="c-lostto-w"><canvas id="c-lostto"></canvas></div></div><div class="card"><div class="ct">Won deals by size</div><div class="chart-wrap" style="height:220px"><canvas id="c-wonsize"></canvas></div></div></div>
+          <div class="card"><div class="ct">Loss reasons by size</div><div class="leg"><span><span class="dot" style="background:#E24B4A"></span>Pricing</span><span><span class="dot" style="background:#7F77DD"></span>Product Gap</span><span><span class="dot" style="background:#EF9F27"></span>Timing</span><span><span class="dot" style="background:#888780"></span>No response</span><span><span class="dot" style="background:#B4B2A9"></span>Unqualified</span></div><div class="chart-wrap" style="height:180px"><canvas id="c-losssz"></canvas></div></div>
+          <div class="card"><div class="ct">Loss reasons by segmentation</div><div class="leg"><span><span class="dot" style="background:#E24B4A"></span>Pricing</span><span><span class="dot" style="background:#7F77DD"></span>Product Gap</span><span><span class="dot" style="background:#EF9F27"></span>Timing</span><span><span class="dot" style="background:#888780"></span>No response</span><span><span class="dot" style="background:#B4B2A9"></span>Unqualified</span></div><div class="chart-wrap" id="c-lossg-w"><canvas id="c-lossg"></canvas></div></div>
+          <div class="card" style="margin-top:14px"><div class="ct">Deals Associated</div><div style="overflow-x:auto"><table><thead><tr><th style="width:22%">Account</th><th style="width:8%">Status</th><th style="width:9%">Close date</th><th style="width:12%">Stage</th><th style="width:8%">ARR</th><th style="width:7%">MRR</th><th style="width:9%">Forecast</th><th style="width:14%">Competitors</th><th style="width:11%">Reason</th></tr></thead><tbody id="v-losses-deals-rows"></tbody></table></div></div>
+        </div>
+        <div id="v-competitors" class="view">
+          <div class="g2"><div class="card"><div class="ct">Competitor frequency</div><div class="chart-wrap" id="c-comp-w"><canvas id="c-comp"></canvas></div></div><div class="card"><div class="ct">Competitors by outcome</div><div class="leg"><span><span class="dot" style="background:#4caf72"></span>Won</span><span><span class="dot" style="background:#e05252"></span>Lost</span><span><span class="dot" style="background:#5b9ef7"></span>Open</span></div><div class="chart-wrap" id="c-compst-w"><canvas id="c-compst"></canvas></div></div></div>
+          <div class="card" style="margin-top:14px"><div class="ct">Deals Associated</div><div style="overflow-x:auto"><table><thead><tr><th style="width:22%">Account</th><th style="width:8%">Status</th><th style="width:9%">Close date</th><th style="width:12%">Stage</th><th style="width:8%">ARR</th><th style="width:7%">MRR</th><th style="width:9%">Forecast</th><th style="width:14%">Competitors</th><th style="width:11%">Reason</th></tr></thead><tbody id="v-competitors-deals-rows"></tbody></table></div></div>
+        </div>
+        <div id="v-pos" class="view">
+          <div class="g2"><div class="card"><div class="ct">Current POS frequency</div><div class="chart-wrap" id="c-pos-w"><canvas id="c-pos"></canvas></div></div><div class="card"><div class="ct">Current POS by outcome</div><div class="leg"><span><span class="dot" style="background:#4caf72"></span>Won</span><span><span class="dot" style="background:#e05252"></span>Lost</span><span><span class="dot" style="background:#5b9ef7"></span>Open</span></div><div class="chart-wrap" id="c-posst-w"><canvas id="c-posst"></canvas></div></div></div>
+          <div class="card" style="margin-top:14px"><div class="ct">Deals Associated</div><div style="overflow-x:auto"><table><thead><tr><th style="width:22%">Account</th><th style="width:8%">Status</th><th style="width:9%">Close date</th><th style="width:12%">Stage</th><th style="width:8%">ARR</th><th style="width:7%">MRR</th><th style="width:9%">Forecast</th><th style="width:14%">Competitors</th><th style="width:11%">Reason</th></tr></thead><tbody id="v-pos-deals-rows"></tbody></table></div></div>
+        </div>
+        <div id="v-winrate" class="view active">
+          <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><div style="font-size:11px;color:var(--text2)">View columns by</div><div class="dim-toggle"><button class="dim-btn active" onclick="setDim('size',this)">Size</button><button class="dim-btn" onclick="setDim('segmentation',this)">Segmentation</button></div></div>
+          <div class="card"><div class="ct" id="matrix-title">Win rate by competitor × size</div><div style="font-size:11px;color:var(--text2);margin-bottom:10px">Closed deals only · W–L · win%</div><div style="overflow-x:auto"><table id="matrix-table"></table></div></div>
+          <div class="card"><div class="ct">Overall win rate per competitor</div><div class="chart-wrap" id="c-wrcomp-w"><canvas id="c-wrcomp"></canvas></div></div>
+          <div class="card" style="margin-top:14px"><div class="ct">Deals Associated</div><div style="overflow-x:auto"><table><thead><tr><th style="width:22%">Account</th><th style="width:8%">Status</th><th style="width:9%">Close date</th><th style="width:12%">Stage</th><th style="width:8%">ARR</th><th style="width:7%">MRR</th><th style="width:9%">Forecast</th><th style="width:14%">Competitors</th><th style="width:11%">Reason</th></tr></thead><tbody id="v-winrate-deals-rows"></tbody></table></div></div>
+        </div>
+        <div id="v-velocity" class="view">
+          <div class="g4" id="m-vel"></div>
+          <div class="g2"><div class="card"><div class="ct">Avg cycle length — won vs lost</div><div class="chart-wrap" style="height:180px"><canvas id="c-vwl"></canvas></div></div><div class="card"><div class="ct">Avg touches — won vs lost</div><div class="chart-wrap" style="height:180px"><canvas id="c-vtch"></canvas></div></div></div>
+          <div class="card"><div class="ct">Open deals past avg won cycle</div><table><thead><tr><th style="width:24%">Account</th><th style="width:9%">Size</th><th style="width:16%">Stage</th><th style="width:10%">Days open</th><th style="width:8%">Touches</th><th style="width:11%">Close date</th><th style="width:22%">Competitors</th></tr></thead><tbody id="stale-rows"></tbody></table></div>
+          <div class="card" style="margin-top:14px"><div class="ct">Deals Associated</div><div style="overflow-x:auto"><table><thead><tr><th style="width:22%">Account</th><th style="width:8%">Status</th><th style="width:9%">Close date</th><th style="width:12%">Stage</th><th style="width:8%">ARR</th><th style="width:7%">MRR</th><th style="width:9%">Forecast</th><th style="width:14%">Competitors</th><th style="width:11%">Reason</th></tr></thead><tbody id="v-velocity-deals-rows"></tbody></table></div></div>
+        </div>
+        <div id="v-alldeals" class="view">
+          <div class="card"><div style="overflow-x:auto"><table><thead><tr><th style="width:16%" onclick="srt('all','name',this)">Account <span class="si">↕</span></th><th style="width:7%" onclick="srt('all','size',this)">Size <span class="si">↕</span></th><th style="width:7%" onclick="srt('all','status',this)">Status <span class="si">↕</span></th><th style="width:9%" onclick="srt('all','closedate',this)">Close date <span class="si">↕</span></th><th style="width:12%">Closed lost reason</th><th style="width:12%">Closed won reason</th><th style="width:10%">POS</th><th style="width:13%">Competitors</th><th style="width:14%">Details</th></tr></thead><tbody id="all-rows"></tbody></table></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RENEWALS & EXPANSION -->
+    <div id="sec-expansion" class="sec">
+      <div style="padding:14px 20px">
+        <p style="font-size:11px;color:var(--text3);margin:0 0 12px 2px">Shows deals where Deal Type is Expansion (existing business) or Renewal.</p>
+        <div class="g-metrics">
+          <div class="metric" style="border-left:3px solid var(--accent)"><div class="lbl">Expansion ARR (won)</div><div class="val" id="exp-arr-w">—</div><div class="sub" id="exp-sub-w"></div></div>
+          <div class="metric" style="border-left:3px solid #5b9ef7"><div class="lbl">Expansion pipeline</div><div class="val" id="exp-arr-o">—</div><div class="sub" id="exp-sub-o"></div></div>
+          <div class="metric" style="border-left:3px solid #4caf72"><div class="lbl">Renewal ARR (won)</div><div class="val" id="ren-arr-w">—</div><div class="sub" id="ren-sub-w"></div></div>
+          <div class="metric" style="border-left:3px solid #e8a030"><div class="lbl">Renewal pipeline</div><div class="val" id="ren-arr-o">—</div><div class="sub" id="ren-sub-o"></div></div>
+        </div>
+        <div class="card"><div class="ct">Upcoming renewals &amp; expansion <span style="font-weight:400;color:var(--text3);font-size:11px;text-transform:none;letter-spacing:0">(next 90 days)</span></div><div style="overflow-x:auto"><table><thead><tr><th style="width:26%">Account</th><th style="width:10%">Type</th><th style="width:12%">Close date</th><th style="width:10%">ARR</th><th style="width:10%">MRR</th><th style="width:14%">Stage</th><th style="width:18%">Forecast</th></tr></thead><tbody id="exp-upcoming-rows"></tbody></table></div></div>
+        <div class="card"><div class="ct">Won renewals &amp; expansion</div><div style="overflow-x:auto"><table><thead><tr><th style="width:28%">Account</th><th style="width:12%">Type</th><th style="width:14%">Close date</th><th style="width:12%">ARR</th><th style="width:12%">MRR</th><th style="width:22%">Won reason</th></tr></thead><tbody id="exp-won-rows"></tbody></table></div></div>
+        <div class="card"><div class="ct">All open renewals &amp; expansion</div><div style="overflow-x:auto"><table><thead><tr><th style="width:26%">Account</th><th style="width:10%">Type</th><th style="width:12%">Close date</th><th style="width:10%">ARR</th><th style="width:10%">MRR</th><th style="width:14%">Stage</th><th style="width:18%">Forecast</th></tr></thead><tbody id="exp-open-rows"></tbody></table></div></div>
+      </div>
+    </div>
+
+    <!-- REVENUE & IMPLEMENTATION -->
+    <div id="sec-revenue" class="sec">
+      <div class="sub-nav" id="rev-subnav">
+        <button class="sub-tab active" onclick="showView('v-rev2026','rev-subnav',this)">2026 Revenue</button>
+        <button class="sub-tab" onclick="showView('v-impl','rev-subnav',this)">Implementation Schedule</button>
+        <button class="sub-tab" onclick="showView('v-open','rev-subnav',this)">Open Deals Detail</button>
+      </div>
+      <div style="padding:14px 20px">
+        <div class="filter-bar">
+          <button class="filter-toggle" id="filter-toggle-btn-rv" onclick="toggleFilters('rv')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg> Filters <span class="filter-caret" id="filter-caret-rv">▾</span></button>
+          <span class="filter-summary" id="filter-summary-rv">Closing: Q2 2026</span>
+        </div>
+        <div class="filter-panel" id="filter-panel-rv" style="display:none">
+          <div class="filter-row">
+            <div class="filter-cell"><label class="gfl">Created in</label><select id="gf-created-rv" onchange="applyFilters('rv')"><option value="all">All time</option><option value="fy26">FY26</option><option value="q2-26">Q2 2026</option><option value="q1-26">Q1 2026</option><option value="q4-25">Q4 2025</option><option value="2026-04">Apr 2026</option><option value="2026-03">Mar 2026</option><option value="2026-02">Feb 2026</option><option value="2026-01">Jan 2026</option><option value="2025-12">Dec 2025</option><option value="2025-11">Nov 2025</option><option value="2025-10">Oct 2025</option></select></div>
+            <div class="filter-cell"><label class="gfl">Closing in</label><select id="gf-closing-rv" onchange="applyFilters('rv')"><option value="all">All time</option><option value="fy26">FY26</option><option value="q2-26" selected>Q2 2026</option><option value="q3-26">Q3 2026</option><option value="q1-26">Q1 2026</option><option value="q4-25">Q4 2025</option><option value="2026-09">Sep 2026</option><option value="2026-08">Aug 2026</option><option value="2026-07">Jul 2026</option><option value="2026-06">Jun 2026</option><option value="2026-05">May 2026</option><option value="2026-04">Apr 2026</option><option value="2026-03">Mar 2026</option><option value="2026-02">Feb 2026</option><option value="2026-01">Jan 2026</option></select></div>
+            <div class="filter-cell"><label class="gfl">Size</label><select id="gf-sz-rv" onchange="applyFilters('rv')"><option value="">All</option><option>SMB</option><option>Medium+</option><option>Mid-Market</option><option>Enterprise</option></select></div>
+            <div class="filter-cell"><label class="gfl">Segmentation</label><select id="gf-sg-rv" onchange="applyFilters('rv')"><option value="">All</option></select></div>
+            <div class="filter-cell"><label class="gfl">Owner / BDR</label><select id="gf-owner-rv" onchange="applyFilters('rv')"><option value="">All owners</option><option value="81638455">Levi O'Brien</option><option value="77422527">Michael Razny</option><option value="77425580">Emily Lawless</option><option value="78064629">Hannah Heintze</option><option value="78930942">Brady Jensen</option><option value="82442702">Dhru-Vina Patel</option><option value="84615860">Kei Wakabayashi</option><option value="84615861">Hemalatha Palani</option></select></div>
+            <button class="filter-reset" onclick="resetFilters('rv')">Reset</button>
+          </div>
+        </div>
+        <div id="v-rev2026" class="view active">
+          <div class="g4" id="m-rev"></div>
+          <div class="card"><div class="ct">2026 revenue projection</div><div style="font-size:11px;color:var(--text2);margin-bottom:10px">2026 Revenue = remaining months after Soft Launch Date × MRR. Only deals with a soft launch date set.</div><div style="overflow-x:auto"><table><thead><tr><th style="width:22%" onclick="srt('rev','name',this)">Account <span class="si">↕</span></th><th style="width:10%" onclick="srt('rev','fc',this)">Forecast <span class="si">↕</span></th><th style="width:9%" onclick="srt('rev','amt',this)">ARR <span class="si">↕</span></th><th style="width:7%" onclick="srt('rev','mrr',this)">MRR <span class="si">↕</span></th><th style="width:11%" onclick="srt('rev','soft_launch',this)">Soft launch <span class="si">↕</span></th><th style="width:11%" onclick="srt('rev','golive',this)">Go-live <span class="si">↕</span></th><th style="width:13%" onclick="srt('rev','rev2026',this)">2026 Revenue <span class="si">↕</span></th></tr></thead><tbody id="rev-rows"></tbody></table></div></div>
+        </div>
+        <div id="v-impl" class="view">
+          <div class="card"><div class="ct">Implementation schedule — sorted by soft launch date</div><div style="overflow-x:auto"><table><thead><tr><th style="width:20%" onclick="srt('impl','name',this)">Account <span class="si">↕</span></th><th style="width:9%" onclick="srt('impl','amt',this)">ARR <span class="si">↕</span></th><th style="width:7%" onclick="srt('impl','mrr',this)">MRR <span class="si">↕</span></th><th style="width:10%" onclick="srt('impl','fc',this)">Forecast <span class="si">↕</span></th><th style="width:10%" onclick="srt('impl','impl_amt',this)">Impl. $ <span class="si">↕</span></th><th style="width:11%" onclick="srt('impl','closedate',this)">Close date <span class="si">↕</span></th><th style="width:11%" onclick="srt('impl','soft_launch',this)">Soft launch <span class="si">↕</span></th><th style="width:11%" onclick="srt('impl','golive',this)">Go-live <span class="si">↕</span></th></tr></thead><tbody id="impl-rows"></tbody></table></div></div>
+        </div>
+        <div id="v-open" class="view">
+          <div class="g4" id="m-open"></div>
+          <div class="card"><div class="ct">Open deals — grouped by close date</div><div style="overflow-x:auto"><table><thead><tr><th style="width:18%" onclick="srt('open','name',this)">Account <span class="si">↕</span></th><th style="width:7%" onclick="srt('open','size',this)">Size <span class="si">↕</span></th><th style="width:13%" onclick="srt('open','stage',this)">Stage <span class="si">↕</span></th><th style="width:9%" onclick="srt('open','fc',this)">Forecast <span class="si">↕</span></th><th style="width:7%" onclick="srt('open','amt',this)">ARR <span class="si">↕</span></th><th style="width:6%" onclick="srt('open','mrr',this)">MRR <span class="si">↕</span></th><th style="width:8%" onclick="srt('open','closedate',this)">Close date <span class="si">↕</span></th><th style="width:7%" onclick="srt('open','days',this)">Days open <span class="si">↕</span></th><th style="width:25%">Next step</th></tr></thead><tbody id="open-rows"></tbody></table></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WON=new Set(["1002966058","1002966059","1002823468","1002823469","1002823470","1059047578","1059047579","1059047580"]);
+const LOST=new Set(["1059151763","1002966060","appointmentscheduled"]);
+const CUTOFF=new Date("2025-10-06");
+const TODAY=new Date();
+const MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const SL={"appointmentscheduled":"Deferred Sales","qualifiedtobuy":"Marketing Handover","presentationscheduled":"Initial Demo Chase","decisionmakerboughtin":"Initial Demo Booked","contractsent":"In-Depth Demo Chase","closedwon":"In-Depth Demo Booked","1002966057":"Contract Negotiation","1002966058":"Closed Won","1002966059":"Implementation Handover","1002966060":"Close Lost - Refer Deferred","1002823467":"Deferred Implementation","1002823468":"Implementation Queue","1002823469":"Implementation Initiated","1002823470":"Live","1002823471":"Churn","1059151763":"Disqualified","1059081802":"Deferred Implementation","1059047578":"Implementation Queue","1059047579":"Implementation Initiated","1059047580":"Live","1059047581":"Churn","closedlost":"Push to Close Deal"};
+const FCL={"COMMIT":"Commit","MOST LIKELY":"Most Likely","BEST_CASE":"Best Case","PIPELINE":"Pipeline","OMIT":"Omit","CLOSED":"Closed","":"—"};
+const FCC={"COMMIT":"fc-commit","MOST LIKELY":"fc-most","BEST_CASE":"fc-best","PIPELINE":"fc-pipeline"};
+const LR=["Pricing","Product Gap","Timing","No response","Unqualified"];
+const LC={"Pricing":"#E24B4A","Product Gap":"#7F77DD","Timing":"#EF9F27","No response":"#888780","Unqualified":"#B4B2A9"};
+const SZO=["SMB","Medium+","Mid-Market","Enterprise"];
+
+const DC={59173002540:54069123456,59171693333:30251467448,59171679087:38668575234,59149481529:53948705332,59018159917:53883580986,58295874133:34112561709,58134644580:29318292825,57941135001:34380787839,57865664259:51369074306,57865089823:42184672066,57855903330:30731894849,57746754624:42179536241,57451847459:29303355788,57347081569:52707098185,57093650361:52234239850,56896712804:34372746639,56611128179:42081950811,56611005261:42215873029,56289503094:49513313833,56200405084:42179598688,55475164967:31172873338,55478494842:29314016409,55200049288:34087256597,55307860234:49745435232,55261285279:34346351507,55200012417:30271026009,55299355795:29331770932,54955883059:49919865146,54735679368:29334102529,54729390174:29310743059,54610055719:44672168578,54267873383:49866222977,54223513524:49419788852,54223510038:34513968676,54166947168:34046465626,54128066376:46499470773,53999237253:49194524277,53998918534:49162229904,53945819498:29334257180,53393846186:29299275688,53388677305:46499534152,53014772295:34112932768,53260576825:48111487882,51340191405:30267801968,47720987519:43038701066,46709565865:32862935138,45144589225:40796411776,45144520503:40756620696,43697646947:34095245701,43163715405:34112563755,43157479946:38982879499,43743093539:39614641560,42089835341:37965051233,41348617897:37101061400,40982044074:29294846847,40715669852:36651011208,40735762708:36651024290,40408255606:36370826594,39510900488:35594612824,38950409796:29295836589,38693612058:34888677552,38821896486:37000541618,38727644074:34925568035,35807214338:32095806211,34797805320:31185036706,34798000945:48895712547,34256214603:42100896630,34229118257:30661964893,33759302494:30231939181,33723391920:30195842913,33723390488:51031799825,33724685599:30223885607,33741890340:30223885226,33741889938:30211596378,33628464172:30104749670,33633806243:30111135807,33633805612:30345676446,33633426222:30104374833,33628457036:30313012116,39256525952:29294846748};
+const CO={53948705332:{size:"SMB",seg:"Local Leader B",pos:""},53883580986:{size:"SMB",seg:"DEF",pos:""},52234239850:{size:"SMB",seg:"Local Leader",pos:"Lightspeed"},49919865146:{size:"SMB",seg:"DEF",pos:""},49513313833:{size:"SMB",seg:"Local Leader B",pos:""},49419788852:{size:"SMB",seg:"DEF",pos:""},49194524277:{size:"SMB",seg:"Local Expanders B",pos:""},49162229904:{size:"SMB",seg:"Local Leader",pos:""},48111487882:{size:"SMB",seg:"Local Leader B",pos:"The Edge"},43038701066:{size:"SMB",seg:"Local Leader",pos:"Diamond Counter"},42184672066:{size:"Medium+",seg:"Premium Luxury B",pos:"Bransom"},42179536241:{size:"SMB",seg:"Local Leader",pos:"Pursuit"},42179598688:{size:"Medium+",seg:"Premium Luxury B",pos:"Pursuit"},42215873029:{size:"Medium+",seg:"Local Expanders A",pos:"Pursuit"},51369074306:{size:"Medium+",seg:"Premium Luxury B",pos:"Encore/Anagram"},42081950811:{size:"Medium+",seg:
