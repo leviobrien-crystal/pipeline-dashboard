@@ -76,7 +76,8 @@ export default async function handler(req, res) {
       'hs_next_step', 'closed_won_reason', 'hubspot_owner_id', 'dealtype'
     ];
     const props2 = [
-      'implementation_amount', 'golive_date', 'soft_launch_date', 'next_step_date'
+      'implementation_amount', 'golive_date', 'soft_launch_date', 'next_step_date',
+      'renewal_amount', 'cc_processing_partner'
     ];
 
     // Page through all results (HubSpot returns max 200 per page)
