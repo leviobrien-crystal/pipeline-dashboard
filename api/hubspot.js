@@ -115,6 +115,37 @@ export default async function handler(req, res) {
       }
     }));
 
+    // ── Live company size/segmentation ──
+    // These attributes live on the associated Company record, not the deal, so we
+    // resolve each deal's company and pull size/segmentation directly from HubSpot.
+    // Non-fatal: if anything here fails, the frontend falls back to its hardcoded map.
+    try {
+      const dealInputs = results.map(d => ({ id: String(d.id) }));
+      const dealToCompany = {};
+      for (let i = 0; i < dealInputs.length; i += 100) {
+        const chunk = dealInputs.slice(i, i + 100);
+        const assoc = await post('https://api.hubapi.com/crm/v4/associations/deals/companies/batch/read', { inputs: chunk });
+        (assoc.results || []).forEach(r => {
+          const fromId = r.from?.id;
+          const cid = r.to?.[0]?.toObjectId || r.to?.[0]?.id;
+          if (fromId && cid) dealToCompany[String(fromId)] = String(cid);
+        });
+      }
+      const companyIds = [...new Set(Object.values(dealToCompany))].map(id => ({ id }));
+      const companyMap = {};
+      for (let i = 0; i < companyIds.length; i += 100) {
+        const chunk = companyIds.slice(i, i + 100);
+        const comp = await post('https://api.hubapi.com/crm/v3/objects/companies/batch/read', { inputs: chunk, properties: ['size', 'segmentation'] });
+        (comp.results || []).forEach(c => { companyMap[c.id] = c.properties || {}; });
+      }
+      results = results.map(d => {
+        const cid = dealToCompany[String(d.id)];
+        const cp = cid ? companyMap[cid] : null;
+        if (cp) d.properties = { ...d.properties, size: d.properties.size || cp.size || '', segmentation: d.properties.segmentation || cp.segmentation || '' };
+        return d;
+      });
+    } catch (e) { /* fall back to hardcoded map on the frontend */ }
+
     return res.status(200).json({ results, total: results.length });
   } catch (err) {
     return res.status(500).json({ error: err.message });
